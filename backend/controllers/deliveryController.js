@@ -1,0 +1,620 @@
+const delivery = require('../models/delivery');
+const tracking = require('../models/tracking');
+const {isAvailable} = require('../services/scheduler');
+const User = require('../models/user');
+const Vehicle = require('../models/vehicle');
+
+// 🔥 UPDATED: Request delivery/ride (Customer)
+const requestDelivery = async (req, res) => {
+    try {
+        const {pickupLocation, dropoffLocation, scheduledAt, distance, fare, vehicleType, deliveryWeight} = req.body;
+
+        const customerId = req.user.id;
+        const newDelivery = await delivery.create({
+            pickupLocation,
+            dropoffLocation,
+            customer: customerId,
+            scheduledAt: scheduledAt || Date.now(),
+            status: 'pending',
+            distance: distance || 0,
+            fare: fare || 0,
+            vehicleType: vehicleType || 'bike',
+            deliveryWeight: deliveryWeight || 0
+            // expiresAt is set automatically by the schema default (5 minutes)
+        });
+        
+        // Populate customer info before sending
+        await newDelivery.populate('customer', 'name email phone');
+        
+        // 🔥 NEW: Set up auto-cancellation timer (5 minutes)
+        setTimeout(async () => {
+            try {
+                const ride = await delivery.findById(newDelivery._id);
+                if (ride && ride.status === 'pending') {
+                    ride.status = 'cancelled';
+                    await ride.save();
+                    
+                    // Notify customer via socket
+                    const io = req.app.get('io');
+                    if (io) {
+                        io.to(`customer: ${customerId}`).emit('ride_expired', {
+                            rideId: ride._id,
+                            message: 'No driver accepted your ride. Please try again.'
+                        });
+                    }
+                    console.log(`⏰ Ride ${newDelivery._id} auto-cancelled - no driver accepted within 5 minutes`);
+                }
+            } catch (error) {
+                console.error('Error auto-cancelling ride:', error);
+            }
+        }, 5 * 60 * 1000); // 5 minutes
+        
+        // 🔥 UPDATED: Find drivers with matching vehicle type who are online
+        const driversWithMatchingVehicles = await Vehicle.find({
+            type: vehicleType,
+            approvalStatus: 'approved',
+            status: 'available'
+        }).distinct('addedBy'); // Changed from 'driver' to 'addedBy'
+        
+        // Get online drivers with matching vehicle type
+        const onlineDrivers = await User.find({
+            _id: { $in: driversWithMatchingVehicles },
+            role: 'driver',
+            driverStatus: 'online'
+        }).select('_id');
+        
+        // Emit to only drivers with matching vehicle type
+        const io = req.app.get('io');
+        if (io && onlineDrivers.length > 0) {
+            onlineDrivers.forEach(driver => {
+                io.to(`driver: ${driver._id.toString()}`).emit('new_ride_request', newDelivery);
+            });
+            console.log(`📢 Sent ${vehicleType} delivery request to ${onlineDrivers.length} matching drivers`);
+        } else {
+            console.log(`⚠️ No online drivers found with ${vehicleType} vehicle type`);
+        }
+        
+        res.status(201).json(newDelivery);
+    }
+    catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+const createDelivery = async (req, res) => {
+    try {
+        const {pickupLocation, dropoffLocation, customer, driver, vehicle, route } = req.body;
+
+        if (route?.startTime && route?.endTime && new Date(route.startTime)) {
+            const start = new Date(route.startTime);
+            const end = new Date(route.endTime);
+            const ok = await isAvailable({driverId: driver, vehicleId: vehicle, startTime: start, endTime: end});
+            if (!ok) {
+                return res.status(400).json({message: 'Driver or Vehicle not available in the selected time range'});
+            }
+        }
+
+        const newDelivery = await delivery.create({
+            pickupLocation,
+            dropoffLocation,
+            customer,
+            driver,
+            vehicle,
+            route
+        });
+        const io = req.app.get('io');
+        if (io && driver) {
+            io.to(`driver: ${driver}`).emit('delivery: assigned', newDelivery);
+        }
+        res.status(201).json(newDelivery);
+    }
+    catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+// 🔥 UPDATED: Update delivery status (Driver/Admin)
+const updateDelivery = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const {status} = req.body;
+        const updateDelivery = await delivery.findById(id).populate('driver vehicle customer');
+        if (!updateDelivery) {
+            return res.status(404).json({message: 'Delivery not found'});
+        }
+
+        // 🔥 UPDATED: Added parcel pickup and delivery statuses for detailed ride flow
+        const allowed = {
+            'pending': ['accepted', 'cancelled'],
+            'accepted': ['parcel_picked', 'cancelled'],
+            'parcel_picked': ['on_route', 'cancelled'],
+            'on_route': ['parcel_delivered', 'cancelled'],
+            'parcel_delivered': ['delivered', 'cancelled'],
+            'delivered': [],
+            'cancelled': []
+        };
+        if (!allowed[updateDelivery.status].includes(status)) {
+            return res.status(400).json({message: `Invalid status transition from ${updateDelivery.status} to ${status}`});
+        }
+        updateDelivery.status = status;
+
+        if (status === 'delivered') {
+            updateDelivery.meta.deliveredAt = new Date();
+            
+            // 🔥 NEW: Update driver and vehicle status when ride is completed
+            if (updateDelivery.driver) {
+                await User.findByIdAndUpdate(updateDelivery.driver._id, { driverStatus: 'online' });
+            }
+            if (updateDelivery.vehicle) {
+                await Vehicle.findByIdAndUpdate(updateDelivery.vehicle._id, { status: 'available' });
+            }
+        }
+        if (status === 'on_route' && !updateDelivery.route.startTime) {
+            updateDelivery.route.startTime = new Date();
+        }
+        if (status === 'parcel_delivered' && !updateDelivery.route.endTime) {
+            updateDelivery.route.endTime = new Date();
+        }
+        if (status === 'parcel_picked' && !updateDelivery.meta.pickupTime) {
+            updateDelivery.meta.pickupTime = new Date();
+        }
+        if (status === 'parcel_delivered' && !updateDelivery.meta.deliveryTime) {
+            updateDelivery.meta.deliveryTime = new Date();
+        }
+        
+        await updateDelivery.save();
+
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`delivery: ${id}`).emit('delivery_update', {id, status, delivery: updateDelivery});
+            if (updateDelivery.driver) {
+                io.to(`driver: ${updateDelivery.driver._id.toString()}`).emit('delivery_status', {id, status});
+                // 🔥 NEW: Notify driver of payment completion
+                if (status === 'delivered') {
+                    io.to(`driver: ${updateDelivery.driver._id.toString()}`).emit('payment_completed', {
+                        ride: updateDelivery,
+                        message: 'Customer has completed the payment'
+                    });
+                }
+            }
+            if (updateDelivery.customer) {
+                io.to(`customer: ${updateDelivery.customer._id.toString()}`).emit('ride_update', {id, status, delivery: updateDelivery});
+            }
+        }
+        res.json(updateDelivery);
+    } catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+const getTrack = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const lastPoints = await tracking.find({delivery: id}).sort({createdAt: -1}).limit(50);
+        const deliver = await delivery.findById(id).populate('driver vehicle customer');
+        res.json({deliver, lastPoints});
+    } catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+// 🔥 NEW: Accept ride (Driver)
+const acceptRide = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { vehicleId } = req.body;
+        
+        const ride = await delivery.findById(id);
+        if (!ride) {
+            return res.status(404).json({message: 'Ride not found'});
+        }
+        
+        if (ride.status !== 'pending') {
+            return res.status(400).json({message: 'Ride is no longer available'});
+        }
+        
+        // Check if driver has an approved vehicle
+        const vehicle = await Vehicle.findOne({
+            _id: vehicleId,
+            driver: req.user.id,
+            approvalStatus: 'approved'
+        });
+        
+        if (!vehicle) {
+            return res.status(400).json({message: 'Vehicle not found or not approved'});
+        }
+        
+        // 🔥 NEW: Validate vehicle type matches ride requirement
+        if (vehicle.type !== ride.vehicleType) {
+            return res.status(400).json({
+                message: `This ride requires a ${ride.vehicleType} but you selected a ${vehicle.type}`
+            });
+        }
+        
+        // Ensure deliveryWeight has a default value if not set
+        if (!ride.deliveryWeight || ride.deliveryWeight === 0) {
+            // Set default based on vehicle capacity or a reasonable default
+            const VEHICLE_CAPACITY = {
+                bike: 20,
+                auto: 100,
+                mini_truck: 500,
+                lorry: 2000
+            };
+            ride.deliveryWeight = vehicle.weightCapacity || VEHICLE_CAPACITY[vehicle.type] || 20;
+        }
+        
+        // Update ride
+        ride.driver = req.user.id;
+        ride.vehicle = vehicleId;
+        ride.status = 'accepted';
+        await ride.save();
+        
+        // Update driver status
+        await User.findByIdAndUpdate(req.user.id, { driverStatus: 'on_ride' });
+        
+        // Ensure vehicle has weightCapacity
+        if (!vehicle.weightCapacity || vehicle.weightCapacity === 0) {
+            const VEHICLE_CAPACITY = {
+                bike: 20,
+                auto: 100,
+                mini_truck: 500,
+                lorry: 2000
+            };
+            vehicle.weightCapacity = VEHICLE_CAPACITY[vehicle.type] || 20;
+        }
+        
+        // Update vehicle status
+        vehicle.status = 'in_service';
+        await vehicle.save();
+        
+        await ride.populate('driver vehicle customer');
+        
+        // Notify customer
+        const io = req.app.get('io');
+        if (io && ride.customer) {
+            io.to(`customer: ${ride.customer._id.toString()}`).emit('ride_accepted', ride);
+        }
+        
+        res.json(ride);
+    } catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+// 🔥 NEW: Get all deliveries/rides
+const getAllDeliveries = async (req, res) => {
+    try {
+        const { status } = req.query;
+        let filter = {};
+        
+        // Filter based on user role
+        if (req.user.role === 'customer') {
+            filter.customer = req.user.id;
+        } else if (req.user.role === 'driver') {
+            filter.driver = req.user.id;
+        }
+        // Admin sees all deliveries (no filter)
+        
+        if (status) filter.status = status;
+        
+        const deliveries = await delivery.find(filter)
+            .populate('customer', 'name email phone')
+            .populate('driver', 'name email phone')
+            .populate('vehicle', 'plate model type')
+            .sort({ createdAt: -1 });
+            
+        res.json(deliveries);
+    } catch (error) {
+        console.error('Error in getAllDeliveries:', error);
+        res.status(500).json({message: 'Server error', error: error.message});
+    }
+};
+
+// 🔥 UPDATED: Get pending rides for drivers (filtered by driver's vehicle types)
+const getPendingRides = async (req, res) => {
+    try {
+        const driverId = req.user.id;
+        
+        // Get all approved vehicles owned by this driver
+        const driverVehicles = await Vehicle.find({
+            addedBy: driverId,
+            approvalStatus: 'approved'
+        }).select('type');
+        
+        if (driverVehicles.length === 0) {
+            return res.json([]);
+        }
+        
+        // Extract unique vehicle types
+        const vehicleTypes = [...new Set(driverVehicles.map(v => v.type))];
+        
+        // Find pending rides that match driver's vehicle types
+        const rides = await delivery.find({ 
+            status: 'pending',
+            vehicleType: { $in: vehicleTypes }
+        })
+            .populate('customer', 'name email phone')
+            .sort({ createdAt: -1 });
+            
+        console.log(`📋 Driver ${driverId} has vehicle types: ${vehicleTypes.join(', ')}, found ${rides.length} matching rides`);
+        res.json(rides);
+    } catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+// 🔥 NEW: Update driver location
+const updateDriverLocation = async (req, res) => {
+    try {
+        const { latitude, longitude } = req.body;
+        
+        await User.findByIdAndUpdate(req.user.id, {
+            currentLocation: {
+                type: 'Point',
+                coordinates: [longitude, latitude]
+            }
+        });
+        
+        // Emit location update via socket
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('driver_location_update', {
+                driverId: req.user.id,
+                location: { latitude, longitude }
+            });
+        }
+        
+        res.json({ message: 'Location updated' });
+    } catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+// 🔥 NEW: Update driver status (online/offline/on_ride)
+const updateDriverStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        
+        if (!['online', 'offline', 'on_ride'].includes(status)) {
+            return res.status(400).json({message: 'Invalid status. Must be: online, offline, or on_ride'});
+        }
+        
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id, 
+            { driverStatus: status },
+            { new: true, runValidators: true }
+        ).select('-password');
+        
+        res.json({ 
+            message: 'Status updated successfully', 
+            status,
+            user: updatedUser 
+        });
+    } catch (error) {
+        res.status(500).json({message: `${error}`});
+    }
+};
+
+// 🔥 NEW: Complete/End ride (Driver)
+const completeRide = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const ride = await delivery.findById(id);
+        
+        if (!ride) {
+            return res.status(404).json({message: 'Ride not found'});
+        }
+        
+        // Verify the driver owns this ride
+        if (ride.driver.toString() !== req.user.id) {
+            return res.status(403).json({message: 'You are not authorized to complete this ride'});
+        }
+        
+        // Update ride status to delivered
+        ride.status = 'delivered';
+        ride.route.endTime = new Date();
+        await ride.save();
+        
+        // Update driver status back to online
+        await User.findByIdAndUpdate(req.user.id, { driverStatus: 'online' });
+        
+        // Update vehicle status to available
+        if (ride.vehicle) {
+            await Vehicle.findByIdAndUpdate(ride.vehicle, { status: 'available' });
+        }
+        
+        console.log(`✅ Ride ${id} completed by driver ${req.user.id}`);
+        
+        // Emit socket event
+        const io = req.app.get('io');
+        if (io) {
+            io.to(ride.customer.toString()).emit('rideCompleted', { ride });
+        }
+        
+        res.json({ 
+            message: 'Ride completed successfully',
+            ride
+        });
+    } catch (error) {
+        console.error('❌ Error completing ride:', error);
+        res.status(500).json({message: error.message || `${error}`});
+    }
+};
+
+// 🔥 NEW: Get driver statistics (rides and earnings)
+const getDriverStatistics = async (req, res) => {
+    try {
+        const driverId = req.user.id;
+        const { period = 'month' } = req.query; // 'day', 'week', 'month', 'year'
+
+        // Get all completed deliveries for this driver
+        const deliveries = await delivery.find({
+            driver: driverId,
+            status: 'delivered'
+        }).sort({ createdAt: -1 });
+
+        // Calculate statistics based on period
+        const now = new Date();
+        let startDate;
+
+        switch (period) {
+            case 'day':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                break;
+            case 'week':
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - now.getDay());
+                weekStart.setHours(0, 0, 0, 0);
+                startDate = weekStart;
+                break;
+            case 'year':
+                startDate = new Date(now.getFullYear(), 0, 1);
+                break;
+            case 'month':
+            default:
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+        }
+
+        // Filter deliveries within the period
+        const periodDeliveries = deliveries.filter(d => d.createdAt >= startDate);
+
+        // Calculate daily statistics for the period
+        const dailyStats = {};
+        const monthlyStats = {};
+
+        periodDeliveries.forEach(delivery => {
+            const date = new Date(delivery.createdAt);
+            const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+            // Daily stats
+            if (!dailyStats[dateKey]) {
+                dailyStats[dateKey] = {
+                    rides: 0,
+                    earnings: 0,
+                    date: dateKey
+                };
+            }
+            dailyStats[dateKey].rides += 1;
+            dailyStats[dateKey].earnings += (delivery.fare || 0) * 0.9; // 90% of fare
+
+            // Monthly stats
+            if (!monthlyStats[monthKey]) {
+                monthlyStats[monthKey] = {
+                    rides: 0,
+                    earnings: 0,
+                    month: monthKey
+                };
+            }
+            monthlyStats[monthKey].rides += 1;
+            monthlyStats[monthKey].earnings += (delivery.fare || 0) * 0.9;
+        });
+
+        // Convert to arrays and sort
+        const dailyStatsArray = Object.values(dailyStats).sort((a, b) => b.date.localeCompare(a.date));
+        const monthlyStatsArray = Object.values(monthlyStats).sort((a, b) => b.month.localeCompare(a.month));
+
+        // Calculate totals
+        const totalRides = periodDeliveries.length;
+        const totalEarnings = periodDeliveries.reduce((sum, d) => sum + (d.fare || 0) * 0.9, 0);
+
+        // Get current period totals
+        const currentPeriodRides = period === 'day' ?
+            (dailyStats[now.toISOString().split('T')[0]]?.rides || 0) :
+            (period === 'month' ?
+                (monthlyStats[`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`]?.rides || 0) :
+                totalRides);
+
+        const currentPeriodEarnings = period === 'day' ?
+            (dailyStats[now.toISOString().split('T')[0]]?.earnings || 0) :
+            (period === 'month' ?
+                (monthlyStats[`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`]?.earnings || 0) :
+                totalEarnings);
+
+        res.json({
+            period,
+            totalRides,
+            totalEarnings: Math.round(totalEarnings * 100) / 100,
+            currentPeriodRides,
+            currentPeriodEarnings: Math.round(currentPeriodEarnings * 100) / 100,
+            dailyStats: dailyStatsArray,
+            monthlyStats: monthlyStatsArray
+        });
+
+    } catch (error) {
+        console.error('Error getting driver statistics:', error);
+        res.status(500).json({message: 'Server error', error: error.message});
+    }
+};
+
+// 🔥 NEW: Cancel ride (Customer)
+const cancelRide = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const ride = await delivery.findById(id);
+        
+        if (!ride) {
+            return res.status(404).json({message: 'Ride not found'});
+        }
+        
+        // Verify the customer owns this ride
+        if (ride.customer.toString() !== req.user.id) {
+            return res.status(403).json({message: 'You are not authorized to cancel this ride'});
+        }
+        
+        // Only allow cancellation if ride is pending, accepted, parcel_picked, on_route, or parcel_delivered
+        if (!['pending', 'accepted', 'parcel_picked', 'on_route', 'parcel_delivered'].includes(ride.status)) {
+            return res.status(400).json({message: 'Cannot cancel ride in current status'});
+        }
+        
+        // Update ride status to cancelled
+        ride.status = 'cancelled';
+        await ride.save();
+        
+        // If driver was assigned, update their status back to online
+        if (ride.driver) {
+            await User.findByIdAndUpdate(ride.driver, { driverStatus: 'online' });
+            
+            // Emit socket event to driver
+            const io = req.app.get('io');
+            if (io) {
+                io.to(ride.driver.toString()).emit('rideCancelled', { 
+                    ride,
+                    message: 'Customer cancelled the ride'
+                });
+            }
+        }
+        
+        // Update vehicle status to available
+        if (ride.vehicle) {
+            await Vehicle.findByIdAndUpdate(ride.vehicle, { status: 'available' });
+        }
+        
+        console.log(`❌ Ride ${id} cancelled by customer ${req.user.id}`);
+        
+        res.json({ 
+            message: 'Ride cancelled successfully',
+            ride
+        });
+    } catch (error) {
+        console.error('❌ Error cancelling ride:', error);
+        res.status(500).json({message: error.message || `${error}`});
+    }
+};
+module.exports = {
+    requestDelivery,
+    createDelivery,
+    updateDelivery,
+    getTrack,
+    acceptRide,
+    getAllDeliveries,
+    getPendingRides,
+    updateDriverLocation,
+    updateDriverStatus,
+    completeRide,
+    cancelRide,
+    getDriverStatistics
+};
