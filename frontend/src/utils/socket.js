@@ -1,7 +1,7 @@
 // 🔥 Socket.IO utility for real-time communication
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://logistics-and-fleet-management-backend.onrender.com';
 
 let socket = null;
 

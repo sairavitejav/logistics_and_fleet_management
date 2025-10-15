@@ -225,7 +225,8 @@ NODE_ENV=development
 
 ### Frontend (.env)
 ```env
-VITE_API_BASE_URL=http://localhost:5001/api
+VITE_API_BASE_URL=https://logistics-and-fleet-management-backend.onrender.com/api
+VITE_SOCKET_URL=https://logistics-and-fleet-management-backend.onrender.com
 ```
 
 ## 📡 API Endpoints
@@ -286,7 +287,7 @@ VITE_API_BASE_URL=http://localhost:5001/api
 ```javascript
 // Client-side connection
 import io from 'socket.io-client';
-const socket = io('http://localhost:5001');
+const socket = io('https://logistics-and-fleet-management-backend.onrender.com');
 
 // Join user room
 socket.emit('join', { userId, role });
@@ -334,32 +335,25 @@ export default ComponentName;
 
 ## 🚀 Deployment
 
-### Backend Deployment
-1. **Build for production:**
-   ```bash
-   npm run build
-   ```
+### Current Live Deployment
 
-2. **Set production environment variables**
+**🚛 Backend API:** `https://logistics-and-fleet-management-backend.onrender.com`
 
-3. **Deploy to hosting platform:**
-   - Heroku
-   - DigitalOcean
-   - AWS EC2
-   - Railway
-   - Render
+**🖥️ Frontend App:** *Deploy to Netlify/Vercel with the updated environment variables above*
+
+### Backend Deployment (Render)
+✅ **Deployed and Active**
+- **Service URL:** `https://logistics-and-fleet-management-backend.onrender.com`
+- **Status:** ✅ Live and operational
+- **Database:** MongoDB Atlas (production)
 
 ### Frontend Deployment
-1. **Build for production:**
-   ```bash
-   npm run build
+1. **Deploy to Netlify or Vercel using the monorepo structure**
+2. **Set environment variables:**
+   ```env
+   VITE_API_BASE_URL=https://logistics-and-fleet-management-backend.onrender.com/api
+   VITE_SOCKET_URL=https://logistics-and-fleet-management-backend.onrender.com
    ```
-
-2. **Deploy to static hosting:**
-   - Netlify
-   - Vercel
-   - GitHub Pages
-   - Firebase Hosting
 
 ### Database
 - **MongoDB Atlas** for cloud database
