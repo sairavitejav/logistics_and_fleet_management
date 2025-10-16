@@ -26,8 +26,8 @@ const RideTracking = () => {
     return () => {
       const socket = getSocket();
       if (socket) {
-        socket.off('rideAccepted');
-        socket.off('rideStatusUpdated');
+        socket.off('ride_accepted');
+        socket.off('ride_update');
         socket.off('driverLocationUpdated');
         socket.off('rideCompleted');
         socket.off('ride_expired');
@@ -110,21 +110,35 @@ const RideTracking = () => {
 
     console.log('🔌 Setting up socket listeners in RideTracking');
 
-    socket.on('rideAccepted', (data) => {
-      console.log('🚕 Ride accepted:', data);
-      setActiveRide(data.ride);
+    // 🔥 FIXED: Listen for correct event names from backend
+    socket.on('ride_accepted', (ride) => {
+      console.log('🚕 Ride accepted:', ride);
+      setActiveRide(ride);
       setHasShownExpirationToast(false); // Reset flag when ride is accepted
-      if (data.ride.driver?.currentLocation) {
+      if (ride.driver?.currentLocation) {
         setDriverLocation([
-          data.ride.driver.currentLocation.coordinates[1],
-          data.ride.driver.currentLocation.coordinates[0]
+          ride.driver.currentLocation.coordinates[1],
+          ride.driver.currentLocation.coordinates[0]
         ]);
       }
+      showToast('Driver accepted your ride!', 'success');
     });
 
-    socket.on('rideStatusUpdated', (data) => {
+    socket.on('ride_update', (data) => {
       console.log('🔄 Ride status updated:', data);
-      setActiveRide(data.ride);
+      setActiveRide(data.delivery);
+      
+      // Show appropriate toast messages for status updates
+      const statusMessages = {
+        'parcel_picked': 'Driver has picked up your parcel',
+        'on_route': 'Driver is on the way to destination',
+        'parcel_delivered': 'Parcel has been delivered!',
+        'delivered': 'Ride completed successfully!'
+      };
+      
+      if (statusMessages[data.status]) {
+        showToast(statusMessages[data.status], 'success');
+      }
     });
 
     socket.on('driverLocationUpdated', (data) => {
