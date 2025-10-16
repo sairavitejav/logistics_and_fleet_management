@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import BookRide from '../components/BookRide';
 import RideTracking from '../components/RideTracking';
 import RideHistorySimple from '../components/RideHistorySimple';
-import DebugInfo from '../components/DebugInfo';
 import '../styles/Dashboard.css';
 
 const CustomerDashboard = () => {
@@ -28,7 +27,6 @@ const CustomerDashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <DebugInfo />
       {/* Mobile Menu Button */}
       <button
         className="mobile-menu-button"

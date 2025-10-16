@@ -28,22 +28,18 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
 
   // Simple fetch function
   const fetchRides = async () => {
-    console.log('🔄 Fetching rides...');
     setLoading(true);
     
     try {
       const data = await deliveryAPI.getAll();
-      console.log('✅ Rides fetched:', data?.length || 0);
-      
       const ridesArray = Array.isArray(data) ? data : [];
       setRides(ridesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
-      console.error('❌ Failed to fetch rides:', error);
+      console.error('Failed to fetch rides:', error);
       setRides([]);
       showToast('Failed to load ride history', 'error');
     } finally {
       setLoading(false);
-      console.log('✅ Loading set to false');
     }
   };
 
@@ -99,7 +95,6 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
     return ride.status === filter;
   });
 
-  console.log('🔍 Render - Loading:', loading, 'Rides:', rides.length);
 
   if (loading) {
     return (

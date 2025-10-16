@@ -7,7 +7,6 @@ import DriverVehicles from '../components/DriverVehicles';
 import PendingRides from '../components/PendingRides';
 import RideHistorySimple from '../components/RideHistorySimple';
 import RideMapView from '../components/RideMapView';
-import DebugInfo from '../components/DebugInfo';
 import { deliveryAPI } from '../utils/api';
 import { useToast } from '../components/Toast'; // ✨ Added Toast
 import '../styles/Dashboard.css';
@@ -139,7 +138,6 @@ const DriverDashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <DebugInfo />
       {/* Mobile Menu Button */}
       <button
         className="mobile-menu-button"

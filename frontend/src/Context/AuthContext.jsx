@@ -17,7 +17,6 @@ const AuthProvider = ({children}) => {
     useEffect(() => {
         const timeout = setTimeout(() => {
             if (loading) {
-                console.warn('Auth loading timeout reached, forcing loading to false');
                 setLoading(false);
             }
         }, 5000); // 5 second timeout
@@ -48,7 +47,7 @@ const AuthProvider = ({children}) => {
             try {
                 connectSocket(user.id, user.role);
             } catch (error) {
-                console.warn('Socket connection failed, continuing without socket:', error);
+                // Silent socket connection failure
             }
         } else {
             localStorage.removeItem('user');
@@ -56,7 +55,7 @@ const AuthProvider = ({children}) => {
             try {
                 disconnectSocket();
             } catch (error) {
-                console.warn('Socket disconnection failed:', error);
+                // Silent socket disconnection failure
             }
         }
     }, [user]);
