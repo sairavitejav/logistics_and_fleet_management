@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FaMapMarkedAlt, FaMapMarkerAlt, FaMapPin } from 'react-icons/fa';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { useToast } from '../components/Toast';
+import RoutingMachine from './RoutingMachine';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../styles/RideTracking.css';
 
@@ -25,6 +27,14 @@ const RideMapView = ({ ride, showDriverLocation = false, height = '400px' }) => 
   }, [ride, showDriverLocation]);
 
   useEffect(() => {
+    // Fix default marker icons
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    });
+
     // Small delay to ensure map is fully loaded before showing markers
     const timer = setTimeout(() => {
       setIsMapReady(true);
@@ -62,6 +72,34 @@ const RideMapView = ({ ride, showDriverLocation = false, height = '400px' }) => 
     (pickupCoords[1] + dropCoords[1]) / 2
   ];
 
+  // Custom marker icons
+  const pickupIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
+  const dropIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
+  const driverIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
   return (
     <motion.div
       className="ride-map-view-container"
@@ -84,10 +122,10 @@ const RideMapView = ({ ride, showDriverLocation = false, height = '400px' }) => 
           {isMapReady && (
             <>
               {/* Pickup Marker */}
-              <Marker position={pickupCoords}>
+              <Marker position={pickupCoords} icon={pickupIcon}>
                 <Popup>
                   <div>
-                    <strong>Pickup Location</strong>
+                    <strong>🟢 Pickup Location</strong>
                     <br />
                     {ride.pickupLocation?.address || 'Location coordinates'}
                   </div>
@@ -95,10 +133,10 @@ const RideMapView = ({ ride, showDriverLocation = false, height = '400px' }) => 
               </Marker>
 
               {/* Drop Marker */}
-              <Marker position={dropCoords}>
+              <Marker position={dropCoords} icon={dropIcon}>
                 <Popup>
                   <div>
-                    <strong>Drop Location</strong>
+                    <strong>🔴 Drop Location</strong>
                     <br />
                     {ride.dropoffLocation?.address || 'Location coordinates'}
                   </div>
@@ -107,10 +145,10 @@ const RideMapView = ({ ride, showDriverLocation = false, height = '400px' }) => 
 
               {/* Driver Location (for active rides) */}
               {showDriverLocation && driverLocation && (
-                <Marker position={driverLocation}>
+                <Marker position={driverLocation} icon={driverIcon}>
                   <Popup>
                     <div>
-                      <strong>Driver Location</strong>
+                      <strong>🔵 Driver Location</strong>
                       <br />
                       Current position
                     </div>
@@ -118,24 +156,12 @@ const RideMapView = ({ ride, showDriverLocation = false, height = '400px' }) => 
                 </Marker>
               )}
 
-              {/* Route Line (for active rides with driver location) */}
-              {showDriverLocation && driverLocation && (
-                <Polyline
-                  positions={[pickupCoords, dropCoords]}
-                  color="var(--primary)"
-                  weight={3}
-                  dashArray="5, 10"
-                />
-              )}
-
-              {/* Route Line (for completed rides - just pickup to drop) */}
-              {!showDriverLocation && (
-                <Polyline
-                  positions={[pickupCoords, dropCoords]}
-                  color="var(--success)"
-                  weight={3}
-                />
-              )}
+              {/* Actual Road Route */}
+              <RoutingMachine 
+                start={pickupCoords} 
+                end={dropCoords} 
+                color={showDriverLocation ? '#007bff' : '#28a745'}
+              />
             </>
           )}
         </MapContainer>
