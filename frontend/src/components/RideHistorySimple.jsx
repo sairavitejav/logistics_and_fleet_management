@@ -27,6 +27,22 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
     }
   };
 
+  // Helper function to check if ride can be rated
+  const canRateRide = (ride) => {
+    if (!ride || userRole !== 'customer') return false;
+    if (ride.status !== 'delivered' && ride.status !== 'parcel_delivered') return false;
+    
+    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
+    return !localFeedback[ride._id];
+  };
+
+  // Helper function to check if feedback was submitted
+  const hasFeedbackSubmitted = (ride) => {
+    if (!ride) return false;
+    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
+    return !!localFeedback[ride._id];
+  };
+
   const userData = getUserData();
   const userRole = userData?.role;
 
@@ -52,12 +68,7 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
     fetchRides();
   }, []);
 
-  // Check feedback status for rides
-  useEffect(() => {
-    if (rides.length > 0 && userRole === 'customer') {
-      checkRidesFeedbackStatus();
-    }
-  }, [rides, userRole]);
+  // Simplified feedback status - no async needed since we use localStorage directly
 
   const checkRidesFeedbackStatus = async () => {
     const feedbackStatus = {};
@@ -347,24 +358,61 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
                   </div>
                 )}
 
-                {/* Feedback Button for Customers */}
-                {userRole === 'customer' && ride.status === 'delivered' && ridesFeedback[ride._id] && (
-                  <div style={{ marginTop: '1rem' }}>
-                    {ridesFeedback[ride._id].canRate ? (
-                      <motion.button
-                        className="btn btn-warning"
-                        onClick={() => setFeedbackModal({ isOpen: true, ride })}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <FaStar /> Rate This Ride
-                      </motion.button>
-                    ) : (
-                      <div className="feedback-status">
-                        <FaStar style={{ color: '#ffc107' }} /> Feedback Submitted
-                      </div>
-                    )}
+                {/* Feedback Button for Customers - Always Persistent */}
+                {canRateRide(ride) && (
+                  <motion.button
+                    className="btn btn-warning"
+                    onClick={() => setFeedbackModal({ isOpen: true, ride })}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    style={{
+                      marginTop: '1rem',
+                      background: 'linear-gradient(135deg, #ffc107 0%, #ff8c00 100%)',
+                      border: 'none',
+                      color: 'white',
+                      fontWeight: '500',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '6px'
+                    }}
+                  >
+                    <FaStar /> Rate This Ride
+                  </motion.button>
+                )}
+
+                {/* Feedback Submitted Status */}
+                {hasFeedbackSubmitted(ride) && (
+                  <div style={{ 
+                    marginTop: '1rem',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    color: '#28a745',
+                    fontWeight: '500',
+                    padding: '0.5rem',
+                    background: '#d4edda',
+                    borderRadius: '6px',
+                    border: '1px solid #c3e6cb'
+                  }}>
+                    <FaStar style={{ color: '#ffc107' }} /> Feedback Submitted ✓
                   </div>
+                )}
+
+                {/* Test Feedback Button - Always show for customers */}
+                {userRole === 'customer' && (
+                  <motion.button
+                    className="btn btn-success"
+                    onClick={() => setFeedbackModal({ isOpen: true, ride })}
+                    style={{ 
+                      marginTop: '1rem',
+                      marginRight: '0.5rem',
+                      background: '#28a745',
+                      border: 'none'
+                    }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FaStar /> Test Feedback
+                  </motion.button>
                 )}
 
                 {/* View on Map button for all users */}
@@ -391,8 +439,8 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
         onClose={() => setFeedbackModal({ isOpen: false, ride: null })}
         ride={feedbackModal.ride}
         onFeedbackSubmitted={() => {
-          checkRidesFeedbackStatus();
-          fetchRides();
+          // Force component re-render to update button states
+          setRides(prev => [...prev]);
         }}
       />
     </motion.div>
