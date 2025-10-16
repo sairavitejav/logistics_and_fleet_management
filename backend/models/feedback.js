@@ -86,7 +86,7 @@ feedbackSchema.virtual('averageRating').get(function() {
 // Static method to calculate driver's overall rating
 feedbackSchema.statics.getDriverRating = async function(driverId) {
     const result = await this.aggregate([
-        { $match: { driver: mongoose.Types.ObjectId(driverId) } },
+        { $match: { driver: new mongoose.Types.ObjectId(driverId) } },
         {
             $group: {
                 _id: null,

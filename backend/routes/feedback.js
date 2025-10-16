@@ -9,21 +9,22 @@ const {
     respondToFeedback,
     canRateRide
 } = require('../controllers/feedbackController');
-const { protect, authorize } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
+const roles = require('../middleware/roles');
 
 // Customer routes
-router.post('/', protect, authorize('customer'), createFeedback);
-router.get('/my-feedback', protect, authorize('customer'), getCustomerFeedback);
-router.get('/can-rate/:rideId', protect, authorize('customer'), canRateRide);
+router.post('/', auth, roles('customer'), createFeedback);
+router.get('/my-feedback', auth, roles('customer'), getCustomerFeedback);
+router.get('/can-rate/:rideId', auth, roles('customer'), canRateRide);
 
 // Driver routes
-router.get('/driver/:driverId', protect, authorize('driver', 'admin'), getDriverFeedback);
+router.get('/driver/:driverId', auth, roles('driver', 'admin'), getDriverFeedback);
 
 // Admin routes
-router.get('/all', protect, authorize('admin'), getAllFeedback);
-router.put('/respond/:feedbackId', protect, authorize('admin'), respondToFeedback);
+router.get('/all', auth, roles('admin'), getAllFeedback);
+router.put('/respond/:feedbackId', auth, roles('admin'), respondToFeedback);
 
 // General routes (accessible by multiple roles)
-router.get('/ride/:rideId', protect, getRideFeedback);
+router.get('/ride/:rideId', auth, getRideFeedback);
 
 module.exports = router;
