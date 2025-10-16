@@ -32,6 +32,13 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
     if (!ride || userRole !== 'customer') return false;
     if (ride.status !== 'delivered' && ride.status !== 'parcel_delivered') return false;
     
+    // Check from the ridesFeedback state first, then fallback to localStorage
+    const feedbackStatus = ridesFeedback[ride._id];
+    if (feedbackStatus) {
+      return feedbackStatus.canRate && !feedbackStatus.alreadyRated;
+    }
+    
+    // Fallback to localStorage check
     const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
     return !localFeedback[ride._id];
   };
@@ -39,6 +46,14 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
   // Helper function to check if feedback was submitted
   const hasFeedbackSubmitted = (ride) => {
     if (!ride) return false;
+    
+    // Check from the ridesFeedback state first, then fallback to localStorage
+    const feedbackStatus = ridesFeedback[ride._id];
+    if (feedbackStatus) {
+      return feedbackStatus.alreadyRated;
+    }
+    
+    // Fallback to localStorage check
     const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
     return !!localFeedback[ride._id];
   };
@@ -67,6 +82,13 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
   useEffect(() => {
     fetchRides();
   }, []);
+
+  // Check feedback status when rides are loaded
+  useEffect(() => {
+    if (rides.length > 0 && userRole === 'customer') {
+      checkRidesFeedbackStatus();
+    }
+  }, [rides, userRole]);
 
   // Simplified feedback status - no async needed since we use localStorage directly
 
@@ -422,6 +444,8 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
         onClose={() => setFeedbackModal({ isOpen: false, ride: null })}
         ride={feedbackModal.ride}
         onFeedbackSubmitted={() => {
+          // Refresh feedback status when feedback is submitted
+          checkRidesFeedbackStatus();
           // Force component re-render to update button states
           setRides(prev => [...prev]);
         }}

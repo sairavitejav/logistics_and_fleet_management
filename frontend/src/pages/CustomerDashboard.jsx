@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaMapMarkerAlt, FaCar, FaHistory, FaUser, FaSignOutAlt, FaBars, FaTimes, FaComments } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaCar, FaHistory, FaUser, FaSignOutAlt, FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../Context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import BookRide from '../components/BookRide';
 import RideTracking from '../components/RideTracking';
 import RideHistorySimple from '../components/RideHistorySimple';
-import LocalFeedbackDisplay from '../components/LocalFeedbackDisplay';
 import '../styles/Dashboard.css';
 
 const CustomerDashboard = () => {
@@ -23,8 +22,7 @@ const CustomerDashboard = () => {
   const tabs = [
     { id: 'book', label: 'Book Ride', icon: <FaMapMarkerAlt /> },
     { id: 'track', label: 'Track Ride', icon: <FaCar /> },
-    { id: 'history', label: 'History', icon: <FaHistory /> },
-    { id: 'feedback', label: 'My Feedback', icon: <FaComments /> }
+    { id: 'history', label: 'History', icon: <FaHistory /> }
   ];
 
   return (
@@ -112,7 +110,6 @@ const CustomerDashboard = () => {
           {activeTab === 'book' && <BookRide onBookingSuccess={() => setActiveTab('track')} />}
           {activeTab === 'track' && <RideTracking />}
           {activeTab === 'history' && <RideHistorySimple />}
-          {activeTab === 'feedback' && <LocalFeedbackDisplay />}
         </div>
       </main>
     </div>
