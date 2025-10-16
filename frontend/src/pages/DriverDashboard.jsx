@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaCar, FaList, FaHistory, FaUser, FaSignOutAlt, FaToggleOn, FaToggleOff, FaBars, FaTimes } from 'react-icons/fa';
+import { FaCar, FaList, FaHistory, FaUser, FaSignOutAlt, FaToggleOn, FaToggleOff, FaBars, FaTimes, FaMapMarkedAlt, FaMapMarkerAlt, FaMapPin } from 'react-icons/fa';
 import { useAuth } from '../Context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import DriverVehicles from '../components/DriverVehicles';
 import PendingRides from '../components/PendingRides';
-import DriverRideHistory from '../components/DriverRideHistory';
+import RideHistorySimple from '../components/RideHistorySimple';
+import RideMapView from '../components/RideMapView';
+import DebugInfo from '../components/DebugInfo';
 import { deliveryAPI } from '../utils/api';
 import { useToast } from '../components/Toast'; // ✨ Added Toast
 import '../styles/Dashboard.css';
@@ -18,6 +20,42 @@ const DriverDashboard = () => {
   const [driverStatus, setDriverStatus] = useState(user?.driverStatus || 'offline');
   const [loading, setLoading] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedRideForMap, setSelectedRideForMap] = useState(null);
+  const [recentRides, setRecentRides] = useState([]);
+
+  // Load recent rides when component mounts
+  useEffect(() => {
+    const loadRecentRides = async () => {
+      try {
+        const rides = await deliveryAPI.getAll();
+        // Filter for completed rides and sort by most recent
+        const completedRides = rides
+          .filter(ride => ride.status === 'delivered' || ride.status === 'completed')
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, 5); // Show only 5 most recent
+        setRecentRides(completedRides);
+      } catch (error) {
+        console.error('Failed to load recent rides:', error);
+      }
+    };
+
+    if (user?.role === 'driver' && user?.id) {
+      loadRecentRides();
+    }
+  }, [user]);
+
+  const handleSelectRideForMap = (ride) => {
+    setSelectedRideForMap(ride);
+    setActiveTab('map');
+  };
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    // Clear selected ride when switching away from map tab
+    if (tabId !== 'map') {
+      setSelectedRideForMap(null);
+    }
+  };
 
   useEffect(() => {
     // Check if driver has ongoing rides and navigate to history if so
@@ -95,11 +133,13 @@ const DriverDashboard = () => {
   const tabs = [
     { id: 'rides', label: 'Available Rides', icon: <FaList /> },
     { id: 'vehicles', label: 'Statistics', icon: <FaCar /> },
-    { id: 'history', label: 'History', icon: <FaHistory /> }
+    { id: 'history', label: 'History', icon: <FaHistory /> },
+    { id: 'map', label: 'Map View', icon: <FaMapMarkedAlt /> }
   ];
 
   return (
     <div className="dashboard-container">
+      <DebugInfo />
       {/* Mobile Menu Button */}
       <button
         className="mobile-menu-button"
@@ -132,7 +172,7 @@ const DriverDashboard = () => {
               key={tab.id}
               className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => {
-                setActiveTab(tab.id);
+                handleTabChange(tab.id);
                 setIsMobileMenuOpen(false); // Close mobile menu when tab is selected
               }}
               whileHover={{ x: 10 }}
@@ -197,9 +237,81 @@ const DriverDashboard = () => {
         </motion.div>
 
         <div className="dashboard-content">
-          {activeTab === 'rides' && <PendingRides onRideAccepted={() => setActiveTab('history')} />}
+          {activeTab === 'rides' && <PendingRides onRideAccepted={() => handleTabChange('history')} />}
           {activeTab === 'vehicles' && <DriverVehicles />}
-          {activeTab === 'history' && <DriverRideHistory />}
+          {activeTab === 'history' && <RideHistorySimple onSelectRideForMap={handleSelectRideForMap} />}
+          {activeTab === 'map' && (
+            <div>
+              {selectedRideForMap ? (
+                <RideMapView ride={selectedRideForMap} showDriverLocation={false} />
+              ) : (
+                <motion.div
+                  className="map-recent-rides"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="recent-rides-header">
+                    <h2><FaMapMarkedAlt /> Select a Ride to View on Map</h2>
+                    <p>Choose from your recent completed rides below</p>
+                  </div>
+
+                  {recentRides.length === 0 ? (
+                    <div className="no-recent-rides">
+                      <FaMapMarkedAlt size={48} color="var(--gray)" />
+                      <h3>No Recent Rides</h3>
+                      <p>Complete some rides to see them here for map viewing</p>
+                    </div>
+                  ) : (
+                    <div className="recent-rides-list">
+                      {recentRides.map((ride) => (
+                        <motion.div
+                          key={ride._id}
+                          className="recent-ride-card"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          <div className="ride-info">
+                            <h4>Ride #{ride._id.slice(-8)}</h4>
+                            <p className="ride-date">
+                              {new Date(ride.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                            <div className="ride-locations">
+                              <span className="location-item">
+                                <FaMapMarkerAlt className="location-icon pickup" />
+                                <span className="location-text">
+                                  {ride.pickupLocation?.address?.split(',')[0] || 'Pickup Location'}
+                                </span>
+                              </span>
+                              <span className="location-item">
+                                <FaMapPin className="location-icon drop" />
+                                <span className="location-text">
+                                  {ride.dropoffLocation?.address?.split(',')[0] || 'Drop Location'}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                          <motion.button
+                            className="btn btn-primary view-map-btn"
+                            onClick={() => handleSelectRideForMap(ride)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <FaMapMarkedAlt /> View on Map
+                          </motion.button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

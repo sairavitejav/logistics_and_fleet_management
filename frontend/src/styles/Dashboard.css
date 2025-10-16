@@ -1,8 +1,149 @@
-/* Dashboard Layout */
-.dashboard-container {
+/* No Ride Container */
+.no-ride-container {
   display: flex;
-  min-height: 100vh;
-  background: var(--light);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  min-height: 300px;
+}
+
+.no-ride-container h2 {
+  margin: 1rem 0 0.5rem 0;
+  color: var(--dark);
+  font-size: 1.5rem;
+}
+
+/* Map View Recent Rides */
+.map-recent-rides {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.recent-rides-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 2rem;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.recent-rides-header h2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--dark);
+}
+
+.recent-rides-header p {
+  margin: 0;
+  color: var(--gray);
+}
+
+.recent-rides-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.recent-ride-card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.recent-ride-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.ride-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--dark);
+  font-size: 1.1rem;
+}
+
+.ride-date {
+  margin: 0 0 1rem 0;
+  color: var(--gray);
+  font-size: 0.9rem;
+}
+
+.ride-locations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.location-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.location-icon {
+  font-size: 0.8rem;
+}
+
+.location-icon.pickup {
+  color: var(--success);
+}
+
+.location-icon.drop {
+  color: var(--danger);
+}
+
+.location-text {
+  color: var(--gray);
+}
+
+.view-map-btn {
+  white-space: nowrap;
+  min-width: 140px;
+}
+
+.no-recent-rides {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.no-recent-rides h3 {
+  margin: 1rem 0 0.5rem 0;
+  color: var(--dark);
+}
+
+.no-recent-rides p {
+  margin: 0;
+  color: var(--gray);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .recent-ride-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .view-map-btn {
+    width: 100%;
+  }
 }
 
 /* Sidebar */

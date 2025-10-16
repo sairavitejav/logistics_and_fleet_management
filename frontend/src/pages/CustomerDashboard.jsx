@@ -5,7 +5,8 @@ import { useAuth } from '../Context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import BookRide from '../components/BookRide';
 import RideTracking from '../components/RideTracking';
-import RideHistory from '../components/RideHistory';
+import RideHistorySimple from '../components/RideHistorySimple';
+import DebugInfo from '../components/DebugInfo';
 import '../styles/Dashboard.css';
 
 const CustomerDashboard = () => {
@@ -27,6 +28,7 @@ const CustomerDashboard = () => {
 
   return (
     <div className="dashboard-container">
+      <DebugInfo />
       {/* Mobile Menu Button */}
       <button
         className="mobile-menu-button"
@@ -109,7 +111,7 @@ const CustomerDashboard = () => {
         <div className="dashboard-content">
           {activeTab === 'book' && <BookRide onBookingSuccess={() => setActiveTab('track')} />}
           {activeTab === 'track' && <RideTracking />}
-          {activeTab === 'history' && <RideHistory />}
+          {activeTab === 'history' && <RideHistorySimple />}
         </div>
       </main>
     </div>

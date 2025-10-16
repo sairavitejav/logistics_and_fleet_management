@@ -13,12 +13,53 @@ const PORT = process.env.PORT || 5001;
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"], // 🔥 UPDATED: Support both Vite ports
-    methods: ["GET", "POST", "PUT", "DELETE"]
+    origin: [
+      "http://localhost:5173", 
+      "http://localhost:5174", 
+      "http://localhost:5175",
+      "https://logistics-and-fleet-management-frontend.onrender.com",
+      "https://logistics-and-fleet-management-frontend.vercel.app",
+      /^https:\/\/.*\.vercel\.app$/,
+      /^https:\/\/.*\.onrender\.com$/
+    ], // 🔥 UPDATED: Support production URLs and patterns
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
   }
 });
 
-app.use(cors());
+// Configure CORS for Express routes
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'https://logistics-and-fleet-management-backend.onrender.com',
+      'https://logistics-and-fleet-management-frontend.onrender.com',
+      'https://logistics-and-fleet-management-frontend.vercel.app'
+    ];
+
+    // Check for Vercel and Render domain patterns
+    const vercelPattern = /^https:\/\/.*\.vercel\.app$/;
+    const renderPattern = /^https:\/\/.*\.onrender\.com$/;
+
+    if (allowedOrigins.indexOf(origin) !== -1 || 
+        vercelPattern.test(origin) || 
+        renderPattern.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 // 🔥 UPDATED: Increase payload limit for image uploads
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));

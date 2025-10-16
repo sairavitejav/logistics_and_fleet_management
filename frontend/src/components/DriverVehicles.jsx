@@ -13,7 +13,7 @@ const DriverVehicles = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState('vehicles'); // 🔥 NEW: Sub-tab state
+  const [activeSubTab, setActiveSubTab] = useState('statistics'); // 🔥 NEW: Sub-tab state
   const [formData, setFormData] = useState({
     make: '',
     model: '',
@@ -200,16 +200,16 @@ const DriverVehicles = () => {
       {/* Sub-tabs Navigation */}
       <div className="sub-tabs">
         <button
-          className={`sub-tab ${activeSubTab === 'vehicles' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('vehicles')}
-        >
-          <FaCar /> My Vehicles
-        </button>
-        <button
           className={`sub-tab ${activeSubTab === 'statistics' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('statistics')}
         >
           <FaChartLine /> Statistics
+        </button>
+        <button
+          className={`sub-tab ${activeSubTab === 'vehicles' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('vehicles')}
+        >
+          <FaCar /> My Vehicles
         </button>
       </div>
 

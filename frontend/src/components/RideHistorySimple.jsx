@@ -1,24 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaHistory, FaMapMarkerAlt, FaMapPin, FaSpinner, FaCheckCircle, FaBox, FaTruck, FaFlagCheckered, FaMapMarkedAlt } from 'react-icons/fa';
 import { deliveryAPI } from '../utils/api';
-import { useToast } from './Toast'; // ✨ Added Toast
-import { ListSkeleton } from './LoadingSkeleton'; // ✨ Added LoadingSkeleton
-import { getVehicleIcon, getVehicleLabel } from '../utils/vehicleIcons'; // 🔥 NEW: Dynamic vehicle icons
+import { useToast } from './Toast';
+import { getVehicleIcon, getVehicleLabel } from '../utils/vehicleIcons';
 import '../styles/RideHistory.css';
 
-const RideHistory = ({ onSelectRideForMap }) => {
-  const { showToast } = useToast(); // ✨ Initialize Toast
+const RideHistorySimple = ({ onSelectRideForMap }) => {
+  const { showToast } = useToast();
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Debug loading state changes
-  useEffect(() => {
-    console.log('🔄 Loading state changed to:', loading);
-  }, [loading]);
   const [filter, setFilter] = useState('all');
   const [completingRide, setCompletingRide] = useState(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const getUserData = () => {
     try {
       const userStr = localStorage.getItem('user');
@@ -31,80 +25,31 @@ const RideHistory = ({ onSelectRideForMap }) => {
 
   const userData = getUserData();
   const userRole = userData?.role;
-  const containerRef = useRef(null);
-  const mountedRef = useRef(true);
 
-  const fetchRides = useCallback(async () => {
+  // Simple fetch function
+  const fetchRides = async () => {
+    console.log('🔄 Fetching rides...');
+    setLoading(true);
+    
     try {
-      console.log('🔄 Fetching rides for history...');
       const data = await deliveryAPI.getAll();
-      console.log('✅ Rides fetched successfully:', data?.length || 0, 'rides');
+      console.log('✅ Rides fetched:', data?.length || 0);
       
-      if (mountedRef.current) {
-        // Ensure data is an array
-        const ridesArray = Array.isArray(data) ? data : [];
-        setRides(ridesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-        console.log('🔄 Setting loading to false...');
-        
-        // Force loading to false with a small delay to ensure state update
-        setTimeout(() => {
-          if (mountedRef.current) {
-            setLoading(false);
-            console.log('✅ Loading forced to false');
-          }
-        }, 100);
-      }
+      const ridesArray = Array.isArray(data) ? data : [];
+      setRides(ridesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
       console.error('❌ Failed to fetch rides:', error);
-      if (mountedRef.current) {
-        // Set empty array instead of keeping loading state
-        setRides([]);
-        setLoading(false);
-        showToast('Failed to load ride history. Please try refreshing.', 'error');
-      }
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    // Listen for force load event
-    const handleForceLoad = () => {
-      console.log('🔧 Force loading history data...');
+      setRides([]);
+      showToast('Failed to load ride history', 'error');
+    } finally {
       setLoading(false);
-    };
+      console.log('✅ Loading set to false');
+    }
+  };
 
-    window.addEventListener('forceHistoryLoad', handleForceLoad);
-
-    return () => {
-      mountedRef.current = false;
-      window.removeEventListener('forceHistoryLoad', handleForceLoad);
-    };
-  }, []);
-
+  // Load data on mount
   useEffect(() => {
     fetchRides();
-  }, [refreshTrigger, fetchRides]);
-
-  // Safety timeout to prevent infinite loading
-  useEffect(() => {
-    if (loading) {
-      const timeout = setTimeout(() => {
-        if (mountedRef.current && loading) {
-          console.warn('⚠️ Loading timeout reached, forcing loading to false');
-          setLoading(false);
-        }
-      }, 8000);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [loading]);
-
-  // Refresh rides when component mounts (navigated to)
-  useEffect(() => {
-    setRefreshTrigger(prev => prev + 1);
-    // Scroll to top when component mounts
-    if (containerRef.current) {
-      containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
   }, []);
 
   const getStatusColor = (status) => {
@@ -120,49 +65,33 @@ const RideHistory = ({ onSelectRideForMap }) => {
     }
   };
 
-  const handleCompleteRide = useCallback(async (rideId) => {
+  const handleCompleteRide = async (rideId) => {
     try {
-      if (mountedRef.current) {
-        setCompletingRide(rideId);
-      }
+      setCompletingRide(rideId);
       await deliveryAPI.completeRide(rideId);
-      if (mountedRef.current) {
-        showToast('Ride completed successfully!', 'success');
-        fetchRides(); // Refresh the list
-      }
+      showToast('Ride completed successfully!', 'success');
+      fetchRides(); // Refresh the list
     } catch (error) {
       console.error('Failed to complete ride:', error);
-      if (mountedRef.current) {
-        showToast(error.message || 'Failed to complete ride', 'error');
-      }
+      showToast(error.message || 'Failed to complete ride', 'error');
     } finally {
-      if (mountedRef.current) {
-        setCompletingRide(null);
-      }
+      setCompletingRide(null);
     }
-  }, [showToast, fetchRides]);
+  };
 
-  const handleStatusUpdate = useCallback(async (rideId, newStatus) => {
+  const handleStatusUpdate = async (rideId, newStatus) => {
     try {
-      if (mountedRef.current) {
-        setCompletingRide(rideId);
-      }
+      setCompletingRide(rideId);
       await deliveryAPI.updateStatus(rideId, newStatus);
-      if (mountedRef.current) {
-        showToast(`Ride status updated to ${newStatus.replace('_', ' ')}!`, 'success');
-        fetchRides(); // Refresh the list
-      }
+      showToast(`Ride status updated to ${newStatus.replace('_', ' ')}!`, 'success');
+      fetchRides(); // Refresh the list
     } catch (error) {
       console.error(`Failed to update ride status to ${newStatus}:`, error);
-      if (mountedRef.current) {
-        showToast(error.message || `Failed to update ride status to ${newStatus.replace('_', ' ')}`, 'error');
-      }
+      showToast(error.message || `Failed to update ride status to ${newStatus.replace('_', ' ')}`, 'error');
     } finally {
-      if (mountedRef.current) {
-        setCompletingRide(null);
-      }
+      setCompletingRide(null);
     }
-  }, [showToast, fetchRides]);
+  };
 
   const filteredRides = rides.filter(ride => {
     if (filter === 'all') return true;
@@ -170,22 +99,24 @@ const RideHistory = ({ onSelectRideForMap }) => {
     return ride.status === filter;
   });
 
-  console.log('🔍 Render check - Loading:', loading, 'Rides count:', rides.length);
+  console.log('🔍 Render - Loading:', loading, 'Rides:', rides.length);
 
   if (loading) {
-    return ( // ✨ Replaced with ListSkeleton
+    return (
       <div className="ride-history-container">
         <div className="history-header">
           <h2><FaHistory /> Ride History</h2>
         </div>
-        <ListSkeleton count={5} />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <FaSpinner className="spinner" size={32} />
+          <p>Loading ride history...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <motion.div
-      ref={containerRef}
       className="ride-history-container"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -299,7 +230,7 @@ const RideHistory = ({ onSelectRideForMap }) => {
                   )}
                 </div>
 
-                {/* 🔥 NEW: Status Update Buttons for Drivers */}
+                {/* Status Update Buttons for Drivers */}
                 {userRole === 'driver' && ride.driver && ride.driver._id === userData?.id && (
                   <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {ride.status === 'accepted' && (
@@ -384,7 +315,7 @@ const RideHistory = ({ onSelectRideForMap }) => {
                   </div>
                 )}
 
-                {/* 🔥 NEW: View on Map button for all users */}
+                {/* View on Map button for all users */}
                 {onSelectRideForMap && (
                   <motion.button
                     className="btn btn-secondary"
@@ -405,4 +336,4 @@ const RideHistory = ({ onSelectRideForMap }) => {
   );
 };
 
-export default RideHistory;
+export default RideHistorySimple;

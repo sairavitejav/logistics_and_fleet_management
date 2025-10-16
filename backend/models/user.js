@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema({
             default: [0, 0]
         }
     },
-    // 🔥 NEW: Profile image
+    // NEW: Profile image
     avatar: {
         type: String,
         default: ''
@@ -58,7 +58,7 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// 🔥 NEW: Index for geospatial queries
+// NEW: Index for geospatial queries
 userSchema.index({ currentLocation: '2dsphere' });
 
 module.exports = mongoose.model('User', userSchema);                

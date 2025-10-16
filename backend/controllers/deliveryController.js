@@ -286,7 +286,7 @@ const getAllDeliveries = async (req, res) => {
     try {
         const { status } = req.query;
         let filter = {};
-        
+
         // Filter based on user role
         if (req.user.role === 'customer') {
             filter.customer = req.user.id;
@@ -294,18 +294,22 @@ const getAllDeliveries = async (req, res) => {
             filter.driver = req.user.id;
         }
         // Admin sees all deliveries (no filter)
-        
+
         if (status) filter.status = status;
-        
+
         const deliveries = await delivery.find(filter)
             .populate('customer', 'name email phone')
             .populate('driver', 'name email phone')
             .populate('vehicle', 'plate model type')
             .sort({ createdAt: -1 });
-            
+
         res.json(deliveries);
     } catch (error) {
         console.error('Error in getAllDeliveries:', error);
+        if (error.message.includes('MongoNetworkError') || error.message.includes('MongooseError')) {
+            // Return empty array if database is not connected
+            return res.json([]);
+        }
         res.status(500).json({message: 'Server error', error: error.message});
     }
 };

@@ -10,27 +10,50 @@ const register = async (req, res) => {
     // Check admin PIN - accept both 'pin' and 'adminPin' for backward compatibility
     if (role === 'admin') {
         const providedPin = adminPin || pin;
-        
+
         if (!providedPin || providedPin === "") {
             return res.status(400).json({ message: 'Admin pin is required' });
         }
-        
+
         // Convert both to strings for comparison
         if (String(providedPin).trim() !== String(process.env.ADMIN_PIN).trim()) {
             return res.status(403).json({ message: 'Invalid admin pin' });
         }
     }
 
-    
     try {
         const exists = await User.findOne({ email });
         if (exists) {
             return res.status(400).json({ message: 'User already exists' });
         }
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, email, password: hashedPassword, role });
+
+        // Create user with verified email (no OTP required)
+        const user = await User.create({
+            name,
+            email,
+            password: hashedPassword,
+            role,
+            emailVerified: true  // Email is verified by default
+        });
+
+        // Generate token for immediate login
         const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY, { expiresIn: '15m' });
-        res.status(201).json({ token , user: { id: user._id, name: user.name, email: user.email, role: user.role, isActive: user.isActive } } );
+
+        // Return success response with token
+        res.status(201).json({
+            message: 'Registration successful! Welcome to our platform.',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                isActive: user.isActive,
+                emailVerified: user.emailVerified
+            }
+        });
     }
     catch (error) {
         res.status(500).json({ message: `${error}` });
@@ -44,6 +67,7 @@ const login = async (req, res) => {
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });

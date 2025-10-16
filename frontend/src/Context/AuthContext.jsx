@@ -13,6 +13,18 @@ const AuthProvider = ({children}) => {
     const [token, setToken] = useState(localStorage.getItem('token') || null);
     const [loading, setLoading] = useState(true);
 
+    // Safety timeout to prevent infinite loading
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (loading) {
+                console.warn('Auth loading timeout reached, forcing loading to false');
+                setLoading(false);
+            }
+        }, 5000); // 5 second timeout
+
+        return () => clearTimeout(timeout);
+    }, [loading]);
+
     useEffect(() => {
         if (token) {
             localStorage.setItem('token', token);
@@ -32,12 +44,20 @@ const AuthProvider = ({children}) => {
     useEffect(() => {
         if (user) {
             localStorage.setItem('user', JSON.stringify(user));
-            // Connect socket when user logs in
-            connectSocket(user.id, user.role);
+            // Connect socket when user logs in (non-blocking)
+            try {
+                connectSocket(user.id, user.role);
+            } catch (error) {
+                console.warn('Socket connection failed, continuing without socket:', error);
+            }
         } else {
             localStorage.removeItem('user');
             // Disconnect socket when user logs out
-            disconnectSocket();
+            try {
+                disconnectSocket();
+            } catch (error) {
+                console.warn('Socket disconnection failed:', error);
+            }
         }
     }, [user]);
 

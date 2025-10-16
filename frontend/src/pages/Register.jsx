@@ -13,6 +13,7 @@ const Register = () => {
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
     phone: '',
     role: 'customer',
     adminPin: ''
@@ -20,6 +21,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showAdminPin, setShowAdminPin] = useState(false);
 
   const handleChange = (e) => {
@@ -36,6 +38,15 @@ const Register = () => {
     setError('');
 
     try {
+      // Validate password confirmation
+      if (formData.password !== formData.confirmPassword) {
+        const errorMsg = 'Passwords do not match. Please try again.';
+        setError(errorMsg);
+        showToast(errorMsg, 'warning');
+        setLoading(false);
+        return;
+      }
+
       // Prepare data
       const registerData = {
         name: formData.name,
@@ -217,7 +228,54 @@ const Register = () => {
             className="form-group"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.45 }}
+          >
+            <label htmlFor="confirmPassword">
+              <FaLock /> Confirm Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                id="confirmPassword"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm your password"
+                required
+                minLength="6"
+                className="input"
+                style={{ paddingRight: '40px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--gray)',
+                  fontSize: '1.1rem',
+                  padding: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="form-group"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.55 }}
           >
             <label htmlFor="role">
               <FaUser /> Register As

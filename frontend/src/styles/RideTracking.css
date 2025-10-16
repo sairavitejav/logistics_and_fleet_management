@@ -1,7 +1,68 @@
-/* Ride Tracking Component */
-.ride-tracking-container {
+/* Ride Map View Component */
+.ride-map-view-container {
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.ride-map-info {
+  margin-top: 2rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.info-card {
+  background: var(--white);
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.info-icon {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.info-icon.pickup {
+  color: var(--success);
+}
+
+.info-icon.drop {
+  color: var(--danger);
+}
+
+.info-item strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--dark);
+}
+
+.info-item p {
+  margin: 0;
+  color: var(--gray);
+  font-size: 0.9rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .info-card {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .info-item {
+    width: 100%;
+  }
 }
 
 .tracking-header {
