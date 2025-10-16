@@ -57,16 +57,24 @@ const FeedbackModal = ({ isOpen, onClose, ride, onFeedbackSubmitted }) => {
         rideId: ride._id,
         rating,
         comment: comment.trim(),
-        categories: Object.keys(categories).reduce((acc, key) => {
-          if (categories[key] > 0) {
-            acc[key] = categories[key];
-          }
-          return acc;
-        }, {}),
-        isAnonymous
+        isAnonymous,
+        timestamp: new Date().toISOString(),
+        driverId: ride.driver?._id,
+        driverName: ride.driver?.name
       };
 
-      await feedbackService.createFeedback(feedbackData);
+      // Store feedback locally for now (until backend is deployed)
+      const existingFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
+      existingFeedback[ride._id] = feedbackData;
+      localStorage.setItem('rideFeedback', JSON.stringify(existingFeedback));
+
+      // Try to submit to backend, but don't fail if it's not available
+      try {
+        await feedbackService.createFeedback(feedbackData);
+      } catch (apiError) {
+        console.log('Backend not available, feedback stored locally');
+      }
+
       showToast('Thank you for your feedback!', 'success');
       onFeedbackSubmitted();
       onClose();
@@ -78,11 +86,7 @@ const FeedbackModal = ({ isOpen, onClose, ride, onFeedbackSubmitted }) => {
       setIsAnonymous(false);
     } catch (error) {
       console.error('Feedback submission error:', error);
-      if (error.message.includes('404') || error.message.includes('Failed to fetch')) {
-        showToast('Feedback system is currently unavailable. Please try again later.', 'error');
-      } else {
-        showToast(error.message || 'Failed to submit feedback', 'error');
-      }
+      showToast('Failed to submit feedback. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -164,26 +168,6 @@ const FeedbackModal = ({ isOpen, onClose, ride, onFeedbackSubmitted }) => {
                   </div>
                 </div>
 
-                {/* Category Ratings */}
-                <div className="category-ratings">
-                  <h3>Rate Specific Aspects (Optional)</h3>
-                  <div className="categories-grid">
-                    {Object.entries(categoryLabels).map(([key, { label, icon: Icon }]) => (
-                      <div key={key} className="category-item">
-                        <div className="category-header">
-                          <Icon />
-                          <span>{label}</span>
-                        </div>
-                        <StarRating 
-                          value={categories[key]} 
-                          onChange={(value) => setCategories(prev => ({ ...prev, [key]: value }))}
-                          category={key}
-                          size={20}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
                 {/* Comment */}
                 <div className="comment-section">

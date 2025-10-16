@@ -61,15 +61,24 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
 
   const checkRidesFeedbackStatus = async () => {
     const feedbackStatus = {};
+    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
+    
     for (const ride of rides) {
       if (ride.status === 'delivered') {
-        try {
-          const canRate = await feedbackService.canRateRide(ride._id);
-          feedbackStatus[ride._id] = canRate;
-        } catch (error) {
-          console.log('Feedback service not available, enabling feedback for completed rides');
-          // If feedback service is not available, allow rating for completed rides
-          feedbackStatus[ride._id] = { canRate: true, alreadyRated: false };
+        // Check if feedback already exists locally
+        const hasLocalFeedback = localFeedback[ride._id];
+        
+        if (hasLocalFeedback) {
+          feedbackStatus[ride._id] = { canRate: false, alreadyRated: true };
+        } else {
+          try {
+            const canRate = await feedbackService.canRateRide(ride._id);
+            feedbackStatus[ride._id] = canRate;
+          } catch (error) {
+            console.log('Feedback service not available, checking local storage');
+            // If feedback service is not available, check local storage and allow rating
+            feedbackStatus[ride._id] = { canRate: true, alreadyRated: false };
+          }
         }
       }
     }
