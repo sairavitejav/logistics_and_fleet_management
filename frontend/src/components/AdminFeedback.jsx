@@ -33,7 +33,15 @@ const AdminFeedback = () => {
       setAnalytics(response.analytics);
       setTotalPages(response.totalPages);
     } catch (error) {
-      showToast('Failed to load feedback', 'error');
+      console.error('Admin feedback fetch error:', error);
+      if (error.message.includes('404') || error.message.includes('Failed to fetch')) {
+        showToast('Feedback system is currently being deployed. Please check back in a few minutes.', 'info');
+      } else {
+        showToast('Failed to load feedback', 'error');
+      }
+      // Set empty state for graceful degradation
+      setFeedback([]);
+      setAnalytics({ averageRating: 0, totalFeedbacks: 0, ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } });
     } finally {
       setLoading(false);
     }

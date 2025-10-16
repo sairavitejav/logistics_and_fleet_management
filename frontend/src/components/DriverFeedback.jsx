@@ -28,7 +28,15 @@ const DriverFeedback = () => {
       setDriverRating(response.driverRating);
       setTotalPages(response.totalPages);
     } catch (error) {
-      showToast('Failed to load feedback', 'error');
+      console.error('Driver feedback fetch error:', error);
+      if (error.message.includes('404') || error.message.includes('Failed to fetch')) {
+        showToast('Feedback system is currently being set up. Please check back later.', 'info');
+      } else {
+        showToast('Failed to load feedback', 'error');
+      }
+      // Set empty state for graceful degradation
+      setFeedback([]);
+      setDriverRating({ averageRating: 0, totalFeedbacks: 0, ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } });
     } finally {
       setLoading(false);
     }

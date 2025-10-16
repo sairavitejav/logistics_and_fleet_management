@@ -67,7 +67,9 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
           const canRate = await feedbackService.canRateRide(ride._id);
           feedbackStatus[ride._id] = canRate;
         } catch (error) {
-          feedbackStatus[ride._id] = { canRate: false, alreadyRated: true };
+          console.log('Feedback service not available, enabling feedback for completed rides');
+          // If feedback service is not available, allow rating for completed rides
+          feedbackStatus[ride._id] = { canRate: true, alreadyRated: false };
         }
       }
     }

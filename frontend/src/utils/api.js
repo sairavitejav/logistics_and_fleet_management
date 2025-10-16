@@ -1,5 +1,5 @@
 // 🔥 API utility for making HTTP requests
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://logistics-and-fleet-management-backend.onrender.com/api';
 
 // Get token from localStorage
 const getToken = () => localStorage.getItem('token');

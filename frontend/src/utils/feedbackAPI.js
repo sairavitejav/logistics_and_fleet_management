@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://logistics-and-fleet-management-backend.onrender.com/api';
 
 // Create axios instance with default config
 const feedbackAPI = axios.create({

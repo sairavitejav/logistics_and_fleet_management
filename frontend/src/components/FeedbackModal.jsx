@@ -77,7 +77,12 @@ const FeedbackModal = ({ isOpen, onClose, ride, onFeedbackSubmitted }) => {
       setCategories({ punctuality: 0, behavior: 0, vehicleCondition: 0, communication: 0 });
       setIsAnonymous(false);
     } catch (error) {
-      showToast(error.message || 'Failed to submit feedback', 'error');
+      console.error('Feedback submission error:', error);
+      if (error.message.includes('404') || error.message.includes('Failed to fetch')) {
+        showToast('Feedback system is currently unavailable. Please try again later.', 'error');
+      } else {
+        showToast(error.message || 'Failed to submit feedback', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }

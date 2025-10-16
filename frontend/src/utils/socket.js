@@ -1,7 +1,7 @@
 // 🔥 Socket.IO utility for real-time communication
 import { io } from 'socket.io-client';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://logistics-and-fleet-management-backend.onrender.com/api';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace('/api', '');
 
 
