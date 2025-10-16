@@ -13,8 +13,9 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #333;
+  color: #212529;
   font-size: 1.5rem;
+  font-weight: 700;
   margin: 0;
 }
 
@@ -150,7 +151,8 @@
 
 .no-feedback h3 {
   margin: 1rem 0 0.5rem 0;
-  color: #333;
+  color: #212529;
+  font-weight: 600;
 }
 
 .no-feedback p {
@@ -187,8 +189,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #666;
+  color: #495057;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .feedback-rating {
@@ -199,8 +202,9 @@
 }
 
 .rating-text {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: #212529;
+  font-size: 1rem;
 }
 
 /* Category Ratings */
@@ -234,9 +238,9 @@
 }
 
 .category-name {
-  font-size: 0.8rem;
-  color: #555;
-  font-weight: 500;
+  font-size: 0.85rem;
+  color: #495057;
+  font-weight: 600;
 }
 
 /* Feedback Comment */
@@ -257,8 +261,9 @@
 .feedback-comment p {
   margin: 0;
   font-style: italic;
-  color: #555;
-  line-height: 1.5;
+  color: #495057;
+  line-height: 1.6;
+  font-size: 0.95rem;
 }
 
 /* Ride Info */
@@ -269,8 +274,9 @@
 }
 
 .ride-info small {
-  color: #666;
-  font-size: 0.8rem;
+  color: #6c757d;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 /* Admin Response */

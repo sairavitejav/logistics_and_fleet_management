@@ -397,23 +397,6 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
                   </div>
                 )}
 
-                {/* Test Feedback Button - Always show for customers */}
-                {userRole === 'customer' && (
-                  <motion.button
-                    className="btn btn-success"
-                    onClick={() => setFeedbackModal({ isOpen: true, ride })}
-                    style={{ 
-                      marginTop: '1rem',
-                      marginRight: '0.5rem',
-                      background: '#28a745',
-                      border: 'none'
-                    }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <FaStar /> Test Feedback
-                  </motion.button>
-                )}
 
                 {/* View on Map button for all users */}
                 {onSelectRideForMap && (
