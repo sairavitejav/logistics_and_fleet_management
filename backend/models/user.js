@@ -46,6 +46,17 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    // NEW: Rating fields for drivers
+    averageRating: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5
+    },
+    totalRatings: {
+        type: Number,
+        default: 0
+    },
     isActive: {
         type: Boolean,
         default: true

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaCar, FaUsers, FaClipboardList, FaUser, FaSignOutAlt, FaChartLine, FaBell, FaBars, FaTimes } from 'react-icons/fa';
+import { FaCar, FaUsers, FaClipboardList, FaUser, FaSignOutAlt, FaChartLine, FaBell, FaBars, FaTimes, FaComments } from 'react-icons/fa';
 import { useAuth } from '../Context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { vehicleAPI } from '../utils/api';
@@ -8,6 +8,7 @@ import AdminVehicles from '../components/AdminVehicles';
 import AdminUsers from '../components/AdminUsers';
 import AdminRides from '../components/AdminRides';
 import AdminStats from '../components/AdminStats';
+import AdminFeedback from '../components/AdminFeedback';
 import '../styles/Dashboard.css';
 
 const AdminDashboard = () => {
@@ -43,10 +44,11 @@ const AdminDashboard = () => {
   };
 
   const tabs = [
-    { id: 'stats', label: 'Statistics', icon: <FaChartLine /> },
-    { id: 'vehicles', label: 'Vehicles', icon: <FaCar /> },
+    { id: 'stats', label: 'Dashboard', icon: <FaChartLine /> },
+    { id: 'vehicles', label: `Vehicles ${pendingApprovalsCount > 0 ? `(${pendingApprovalsCount})` : ''}`, icon: <FaCar /> },
     { id: 'users', label: 'Users', icon: <FaUsers /> },
-    { id: 'rides', label: 'All Rides', icon: <FaClipboardList /> }
+    { id: 'rides', label: 'All Rides', icon: <FaClipboardList /> },
+    { id: 'feedback', label: 'Customer Feedback', icon: <FaComments /> }
   ];
 
   return (
@@ -187,6 +189,7 @@ const AdminDashboard = () => {
           {activeTab === 'vehicles' && <AdminVehicles />}
           {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'rides' && <AdminRides />}
+          {activeTab === 'feedback' && <AdminFeedback />}
         </div>
       </main>
     </div>

@@ -7,6 +7,7 @@ import DriverVehicles from '../components/DriverVehicles';
 import PendingRides from '../components/PendingRides';
 import RideHistorySimple from '../components/RideHistorySimple';
 import RideMapView from '../components/RideMapView';
+import DriverFeedback from '../components/DriverFeedback';
 import { deliveryAPI } from '../utils/api';
 import { useToast } from '../components/Toast'; // ✨ Added Toast
 import '../styles/Dashboard.css';
@@ -133,6 +134,7 @@ const DriverDashboard = () => {
     { id: 'rides', label: 'Available Rides', icon: <FaList /> },
     { id: 'vehicles', label: 'Statistics', icon: <FaCar /> },
     { id: 'history', label: 'History', icon: <FaHistory /> },
+    { id: 'feedback', label: 'My Ratings', icon: <FaUser /> },
     { id: 'map', label: 'Map View', icon: <FaMapMarkedAlt /> }
   ];
 
@@ -238,6 +240,7 @@ const DriverDashboard = () => {
           {activeTab === 'rides' && <PendingRides onRideAccepted={() => handleTabChange('history')} />}
           {activeTab === 'vehicles' && <DriverVehicles />}
           {activeTab === 'history' && <RideHistorySimple onSelectRideForMap={handleSelectRideForMap} />}
+          {activeTab === 'feedback' && <DriverFeedback />}
           {activeTab === 'map' && (
             <div>
               {selectedRideForMap ? (

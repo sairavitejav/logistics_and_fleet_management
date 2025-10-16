@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaHistory, FaMapMarkerAlt, FaMapPin, FaSpinner, FaCheckCircle, FaBox, FaTruck, FaFlagCheckered, FaMapMarkedAlt } from 'react-icons/fa';
+import { FaHistory, FaMapMarkerAlt, FaMapPin, FaSpinner, FaCheckCircle, FaBox, FaTruck, FaFlagCheckered, FaMapMarkedAlt, FaStar } from 'react-icons/fa';
 import { deliveryAPI } from '../utils/api';
+import { feedbackService } from '../utils/feedbackAPI';
 import { useToast } from './Toast';
 import { getVehicleIcon, getVehicleLabel } from '../utils/vehicleIcons';
+import FeedbackModal from './FeedbackModal';
 import '../styles/RideHistory.css';
 
 const RideHistorySimple = ({ onSelectRideForMap }) => {
@@ -12,6 +14,8 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [completingRide, setCompletingRide] = useState(null);
+  const [feedbackModal, setFeedbackModal] = useState({ isOpen: false, ride: null });
+  const [ridesFeedback, setRidesFeedback] = useState({});
 
   const getUserData = () => {
     try {
@@ -47,6 +51,28 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
   useEffect(() => {
     fetchRides();
   }, []);
+
+  // Check feedback status for rides
+  useEffect(() => {
+    if (rides.length > 0 && userRole === 'customer') {
+      checkRidesFeedbackStatus();
+    }
+  }, [rides, userRole]);
+
+  const checkRidesFeedbackStatus = async () => {
+    const feedbackStatus = {};
+    for (const ride of rides) {
+      if (ride.status === 'delivered') {
+        try {
+          const canRate = await feedbackService.canRateRide(ride._id);
+          feedbackStatus[ride._id] = canRate;
+        } catch (error) {
+          feedbackStatus[ride._id] = { canRate: false, alreadyRated: true };
+        }
+      }
+    }
+    setRidesFeedback(feedbackStatus);
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -310,6 +336,26 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
                   </div>
                 )}
 
+                {/* Feedback Button for Customers */}
+                {userRole === 'customer' && ride.status === 'delivered' && ridesFeedback[ride._id] && (
+                  <div style={{ marginTop: '1rem' }}>
+                    {ridesFeedback[ride._id].canRate ? (
+                      <motion.button
+                        className="btn btn-warning"
+                        onClick={() => setFeedbackModal({ isOpen: true, ride })}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <FaStar /> Rate This Ride
+                      </motion.button>
+                    ) : (
+                      <div className="feedback-status">
+                        <FaStar style={{ color: '#ffc107' }} /> Feedback Submitted
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* View on Map button for all users */}
                 {onSelectRideForMap && (
                   <motion.button
@@ -327,6 +373,17 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
           ))}
         </div>
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={feedbackModal.isOpen}
+        onClose={() => setFeedbackModal({ isOpen: false, ride: null })}
+        ride={feedbackModal.ride}
+        onFeedbackSubmitted={() => {
+          checkRidesFeedbackStatus();
+          fetchRides();
+        }}
+      />
     </motion.div>
   );
 };
