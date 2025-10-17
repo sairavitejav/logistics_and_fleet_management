@@ -9,11 +9,16 @@ const {
 } = require('../controllers/paymentController');
 const { auth } = require('../middleware/auth');
 
-// All routes require authentication
-router.use(auth);
+// Initiate payment for a delivery (temporarily without auth for testing)
+router.post('/initiate', (req, res, next) => {
+    console.log('🔥 INITIATE ROUTE HIT');
+    console.log('🔥 Headers:', req.headers);
+    console.log('🔥 Body:', req.body);
+    next();
+}, auth, initiatePayment);
 
-// Initiate payment for a delivery
-router.post('/initiate', initiatePayment);
+// All other routes require authentication
+router.use(auth);
 
 // Process payment with selected method
 router.post('/:paymentId/process', processPayment);
@@ -32,6 +37,17 @@ router.get('/test', (req, res) => {
     res.json({ 
         message: 'Payment system is working',
         user: req.user ? { id: req.user.id, role: req.user.role } : null,
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Simple test endpoint without authentication
+router.post('/test-initiate', (req, res) => {
+    console.log('🧪 TEST INITIATE CALLED');
+    console.log('🧪 Request body:', req.body);
+    res.json({ 
+        message: 'Test initiate endpoint working',
+        body: req.body,
         timestamp: new Date().toISOString()
     });
 });
