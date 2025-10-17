@@ -179,6 +179,16 @@ const updateDelivery = async (req, res) => {
             }
             if (updateDelivery.customer) {
                 io.to(`customer: ${updateDelivery.customer._id.toString()}`).emit('ride_update', {id, status, delivery: updateDelivery});
+                
+                // 🔥 NEW: Trigger payment when parcel is delivered
+                if (status === 'parcel_delivered') {
+                    io.to(`customer: ${updateDelivery.customer._id.toString()}`).emit('payment_required', {
+                        deliveryId: id,
+                        amount: updateDelivery.fare,
+                        message: 'Your parcel has been delivered. Please complete the payment.',
+                        delivery: updateDelivery
+                    });
+                }
             }
         }
         res.json(updateDelivery);

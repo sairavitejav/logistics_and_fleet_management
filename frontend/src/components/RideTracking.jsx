@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaMapMarkedAlt, FaSpinner, FaCar, FaPhone, FaTimes, FaClock } from 'react-icons/fa';
+import { FaMapMarkedAlt, FaSpinner, FaCar, FaPhone, FaTimes, FaClock, FaCreditCard } from 'react-icons/fa';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import { deliveryAPI } from '../utils/api';
 import { getSocket } from '../utils/socket';
 import { useToast } from './Toast';
 import { MapSkeleton } from './LoadingSkeleton';
+import PaymentModal from './PaymentModal';
 import 'leaflet/dist/leaflet.css';
 import '../styles/RideTracking.css';
 
@@ -17,6 +18,8 @@ const RideTracking = () => {
   const [cancelling, setCancelling] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [hasShownExpirationToast, setHasShownExpirationToast] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentRequired, setPaymentRequired] = useState(false);
   const isFirstTimerCheck = useRef(true);
 
   useEffect(() => {
@@ -31,6 +34,8 @@ const RideTracking = () => {
         socket.off('driverLocationUpdated');
         socket.off('rideCompleted');
         socket.off('ride_expired');
+        socket.off('payment_required');
+        socket.off('payment_completed');
       }
     };
   }, []);
@@ -158,6 +163,23 @@ const RideTracking = () => {
       setTimeRemaining(null);
       setHasShownExpirationToast(false); // Reset flag for next ride
     });
+
+    // 🔥 NEW: Listen for payment required
+    socket.on('payment_required', (data) => {
+      console.log('💳 Payment required:', data);
+      setPaymentRequired(true);
+      showToast('Your parcel has been delivered. Please complete the payment.', 'info');
+    });
+
+    // 🔥 NEW: Listen for payment completed
+    socket.on('payment_completed', (data) => {
+      console.log('✅ Payment completed:', data);
+      setPaymentRequired(false);
+      setShowPaymentModal(false);
+      showToast('Payment completed successfully!', 'success');
+      // Refresh ride data
+      fetchActiveRide();
+    });
   };
 
   const handleCancelRide = async () => {
@@ -215,6 +237,20 @@ const RideTracking = () => {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // 🔥 NEW: Handle payment modal
+  const handlePayNow = () => {
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = (paymentData) => {
+    console.log('💳 Payment successful:', paymentData);
+    setPaymentRequired(false);
+    setShowPaymentModal(false);
+    showToast('Payment completed successfully! Receipt sent to your email.', 'success');
+    // Refresh ride data to get updated status
+    fetchActiveRide();
   };
 
   if (loading) {
@@ -392,8 +428,50 @@ const RideTracking = () => {
               </motion.button>
             </div>
           )}
+
+          {/* 🔥 NEW: Payment Section */}
+          {(activeRide.status === 'parcel_delivered' || paymentRequired) && (
+            <div className="detail-card payment-card">
+              <h3>💳 Payment Required</h3>
+              <div className="payment-info">
+                <div className="payment-amount">
+                  <span>Total Amount:</span>
+                  <strong>₹{activeRide.fare}</strong>
+                </div>
+                <p className="payment-message">
+                  Your parcel has been delivered successfully. Please complete the payment to finish your ride.
+                </p>
+                <motion.button
+                  className="btn btn-success btn-block payment-btn"
+                  onClick={handlePayNow}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                    border: 'none',
+                    padding: '15px',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 15px rgba(40, 167, 69, 0.3)'
+                  }}
+                >
+                  <FaCreditCard style={{ marginRight: '8px' }} />
+                  Pay Now - ₹{activeRide.fare}
+                </motion.button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 🔥 NEW: Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        deliveryData={activeRide}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </motion.div>
   );
 };

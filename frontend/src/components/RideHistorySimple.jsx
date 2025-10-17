@@ -32,30 +32,39 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
     if (!ride || userRole !== 'customer') return false;
     if (ride.status !== 'delivered' && ride.status !== 'parcel_delivered') return false;
     
-    // Check from the ridesFeedback state first, then fallback to localStorage
+    // Always check localStorage first for immediate feedback
+    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
+    if (localFeedback[ride._id]) {
+      return false; // Already has feedback locally
+    }
+    
+    // Check from the ridesFeedback state (backend status)
     const feedbackStatus = ridesFeedback[ride._id];
     if (feedbackStatus) {
       return feedbackStatus.canRate && !feedbackStatus.alreadyRated;
     }
     
-    // Fallback to localStorage check
-    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
-    return !localFeedback[ride._id];
+    // Default to true for completed rides without feedback (allow rating)
+    return true;
   };
 
   // Helper function to check if feedback was submitted
   const hasFeedbackSubmitted = (ride) => {
     if (!ride) return false;
     
-    // Check from the ridesFeedback state first, then fallback to localStorage
+    // Always check localStorage first for immediate feedback
+    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
+    if (localFeedback[ride._id]) {
+      return true; // Has feedback locally
+    }
+    
+    // Check from the ridesFeedback state (backend status)
     const feedbackStatus = ridesFeedback[ride._id];
     if (feedbackStatus) {
       return feedbackStatus.alreadyRated;
     }
     
-    // Fallback to localStorage check
-    const localFeedback = JSON.parse(localStorage.getItem('rideFeedback') || '{}');
-    return !!localFeedback[ride._id];
+    return false;
   };
 
   const userData = getUserData();
@@ -380,43 +389,47 @@ const RideHistorySimple = ({ onSelectRideForMap }) => {
                   </div>
                 )}
 
-                {/* Feedback Button for Customers - Always Persistent */}
-                {canRateRide(ride) && (
-                  <motion.button
-                    className="btn btn-warning"
-                    onClick={() => setFeedbackModal({ isOpen: true, ride })}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    style={{
-                      marginTop: '1rem',
-                      background: 'linear-gradient(135deg, #ffc107 0%, #ff8c00 100%)',
-                      border: 'none',
-                      color: 'white',
-                      fontWeight: '500',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '6px'
-                    }}
-                  >
-                    <FaStar /> Rate This Ride
-                  </motion.button>
-                )}
+                {/* Feedback Button for Customers */}
+                {userRole === 'customer' && (ride.status === 'delivered' || ride.status === 'parcel_delivered') && (
+                  <>
+                    {canRateRide(ride) && (
+                      <motion.button
+                        className="btn btn-warning"
+                        onClick={() => setFeedbackModal({ isOpen: true, ride })}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        style={{
+                          marginTop: '1rem',
+                          background: 'linear-gradient(135deg, #ffc107 0%, #ff8c00 100%)',
+                          border: 'none',
+                          color: 'white',
+                          fontWeight: '500',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        <FaStar /> Rate This Ride
+                      </motion.button>
+                    )}
 
-                {/* Feedback Submitted Status */}
-                {hasFeedbackSubmitted(ride) && (
-                  <div style={{ 
-                    marginTop: '1rem',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.5rem',
-                    color: '#28a745',
-                    fontWeight: '500',
-                    padding: '0.5rem',
-                    background: '#d4edda',
-                    borderRadius: '6px',
-                    border: '1px solid #c3e6cb'
-                  }}>
-                    <FaStar style={{ color: '#ffc107' }} /> Feedback Submitted ✓
-                  </div>
+                    {/* Feedback Submitted Status */}
+                    {hasFeedbackSubmitted(ride) && (
+                      <div style={{ 
+                        marginTop: '1rem',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        color: '#28a745',
+                        fontWeight: '500',
+                        padding: '0.5rem',
+                        background: '#d4edda',
+                        borderRadius: '6px',
+                        border: '1px solid #c3e6cb'
+                      }}>
+                        <FaStar style={{ color: '#ffc107' }} /> Feedback Submitted ✓
+                      </div>
+                    )}
+                  </>
                 )}
 
 

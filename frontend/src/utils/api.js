@@ -172,8 +172,12 @@ export const deliveryAPI = {
   getDriverStatistics: (period = 'month') => fetchAPI(`/deliveries/driver/statistics?period=${period}`)
 };
 
+// Export fetchAPI for use in other modules
+export { fetchAPI };
+
 export default {
   authAPI,
   vehicleAPI,
-  deliveryAPI
+  deliveryAPI,
+  fetchAPI
 };

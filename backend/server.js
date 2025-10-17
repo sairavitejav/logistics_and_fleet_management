@@ -103,6 +103,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/feedback', require('./routes/feedback'));
+app.use('/api/payments', require('./routes/payment'));
 // app.use('/api/tracking', require('./routes/tracking'));
 
 // 🔥 NEW: Socket.IO connection handling

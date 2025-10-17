@@ -1,3 +1,58 @@
+/* Payment Section Styles */
+.payment-card {
+  border: 2px solid #28a745 !important;
+  background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%) !important;
+}
+
+.payment-card h3 {
+  color: #28a745;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.payment-info {
+  text-align: center;
+}
+
+.payment-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 15px 20px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.payment-amount span {
+  color: #6c757d;
+  font-size: 1rem;
+}
+
+.payment-amount strong {
+  color: #28a745;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.payment-message {
+  color: #495057;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.payment-btn {
+  transition: all 0.3s ease;
+}
+
+.payment-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4) !important;
+}
+
 /* Ride Map View Component */
 .ride-map-view-container {
   max-width: 1200px;

@@ -116,7 +116,133 @@ const sendWelcomeEmail = async (email, name, role) => {
   }
 };
 
+// Send payment receipt email
+const sendPaymentReceiptEmail = async (email, paymentData, customerName) => {
+  try {
+    const transporter = createTransporter();
+    
+    const {
+      transactionId,
+      receipt,
+      amount,
+      paymentMethod,
+      delivery,
+      completedAt
+    } = paymentData;
+
+    const formatDate = (date) => {
+      return new Date(date).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const getPaymentMethodDisplay = (method) => {
+      switch (method.type) {
+        case 'card':
+          return `${method.cardDetails?.cardType?.toUpperCase() || 'Card'} ending in ${method.cardDetails?.last4Digits}`;
+        case 'upi':
+          return `UPI - ${method.upiDetails?.upiId}`;
+        case 'wallet':
+          return `${method.walletDetails?.walletProvider?.toUpperCase() || 'Wallet'}`;
+        case 'netbanking':
+          return 'Net Banking';
+        default:
+          return 'Digital Payment';
+      }
+    };
+
+    const mailOptions = {
+      from: process.env.SENDGRID_API_KEY ? process.env.SENDGRID_FROM_EMAIL || 'Logistics App <noreply@yourdomain.com>' : process.env.EMAIL_USER || 'noreply@logisticsapp.com',
+      to: email,
+      subject: `Payment Receipt - ${receipt.receiptNumber}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #007bff; padding-bottom: 20px;">
+              <h1 style="color: #007bff; margin: 0; font-size: 28px;">🚚 Logistics & Fleet</h1>
+              <p style="color: #666; margin: 5px 0 0 0; font-size: 16px;">Payment Receipt</p>
+            </div>
+
+            <!-- Receipt Details -->
+            <div style="background-color: #e8f4fd; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+              <h2 style="color: #333; margin: 0 0 15px 0; font-size: 20px;">✅ Payment Successful</h2>
+              <p style="margin: 5px 0; color: #555;"><strong>Receipt Number:</strong> ${receipt.receiptNumber}</p>
+              <p style="margin: 5px 0; color: #555;"><strong>Transaction ID:</strong> ${transactionId}</p>
+              <p style="margin: 5px 0; color: #555;"><strong>Date & Time:</strong> ${formatDate(completedAt)}</p>
+            </div>
+
+            <!-- Customer Details -->
+            <div style="margin-bottom: 25px;">
+              <h3 style="color: #333; margin: 0 0 10px 0; font-size: 18px;">Customer Details</h3>
+              <p style="margin: 5px 0; color: #555;"><strong>Name:</strong> ${customerName}</p>
+              <p style="margin: 5px 0; color: #555;"><strong>Email:</strong> ${email}</p>
+            </div>
+
+            <!-- Ride Details -->
+            <div style="margin-bottom: 25px;">
+              <h3 style="color: #333; margin: 0 0 10px 0; font-size: 18px;">Ride Details</h3>
+              <p style="margin: 5px 0; color: #555;"><strong>From:</strong> ${delivery.pickupLocation?.address || 'Pickup Location'}</p>
+              <p style="margin: 5px 0; color: #555;"><strong>To:</strong> ${delivery.dropoffLocation?.address || 'Drop Location'}</p>
+              <p style="margin: 5px 0; color: #555;"><strong>Vehicle Type:</strong> ${delivery.vehicleType?.toUpperCase() || 'N/A'}</p>
+              <p style="margin: 5px 0; color: #555;"><strong>Distance:</strong> ${delivery.distance || 0} km</p>
+            </div>
+
+            <!-- Payment Breakdown -->
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+              <h3 style="color: #333; margin: 0 0 15px 0; font-size: 18px;">Payment Breakdown</h3>
+              <div style="display: flex; justify-content: space-between; margin: 8px 0; padding: 8px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #555;">Base Fare:</span>
+                <span style="color: #333; font-weight: bold;">₹${amount.baseFare}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 8px 0; padding: 8px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #555;">Distance Fare:</span>
+                <span style="color: #333; font-weight: bold;">₹${amount.distanceFare}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 15px 0 0 0; padding: 15px 0 0 0; border-top: 2px solid #007bff;">
+                <span style="color: #333; font-size: 18px; font-weight: bold;">Total Amount:</span>
+                <span style="color: #007bff; font-size: 20px; font-weight: bold;">₹${amount.totalAmount}</span>
+              </div>
+            </div>
+
+            <!-- Payment Method -->
+            <div style="margin-bottom: 25px;">
+              <h3 style="color: #333; margin: 0 0 10px 0; font-size: 18px;">Payment Method</h3>
+              <p style="margin: 5px 0; color: #555; font-weight: bold;">${getPaymentMethodDisplay(paymentMethod)}</p>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+              <p style="color: #666; margin: 5px 0; font-size: 14px;">Thank you for using our logistics service!</p>
+              <p style="color: #666; margin: 5px 0; font-size: 14px;">For support, contact us at support@logistics.com</p>
+              <div style="margin-top: 15px;">
+                <span style="background-color: #28a745; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                  ✓ PAYMENT VERIFIED
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error('Payment receipt email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOTPEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendPaymentReceiptEmail
 };
