@@ -57,6 +57,13 @@ const initiatePayment = async (req, res) => {
             });
         }
 
+        // Check if driver exists - for dummy payments, we'll allow null driver
+        if (!deliveryDoc.driver) {
+            console.log('⚠️ No driver assigned to delivery - using dummy driver for payment testing');
+            // For testing purposes, we'll create a dummy driver reference
+            // In production, this should be properly handled
+        }
+
         // Check if payment already exists
         const existingPayment = await Payment.findOne({ delivery: deliveryId });
         if (existingPayment) {
@@ -73,7 +80,7 @@ const initiatePayment = async (req, res) => {
         const paymentData = {
             delivery: deliveryId,
             customer: customerId,
-            driver: deliveryDoc.driver._id,
+            driver: deliveryDoc.driver ? deliveryDoc.driver._id : customerId, // Use customer as dummy driver if no driver
             amount: {
                 baseFare,
                 distanceFare,
@@ -184,12 +191,14 @@ const processPayment = async (req, res) => {
                         delivery: deliveryToUpdate
                     });
 
-                    // Notify driver
-                    io.to(`driver: ${payment.driver._id.toString()}`).emit('payment_received', {
-                        paymentId: payment._id,
-                        amount: payment.amount.totalAmount,
-                        delivery: deliveryToUpdate
-                    });
+                    // Notify driver (only if different from customer)
+                    if (payment.driver._id.toString() !== customerId) {
+                        io.to(`driver: ${payment.driver._id.toString()}`).emit('payment_received', {
+                            paymentId: payment._id,
+                            amount: payment.amount.totalAmount,
+                            delivery: deliveryToUpdate
+                        });
+                    }
 
                     // Notify about delivery completion
                     io.to(`delivery: ${deliveryToUpdate._id}`).emit('delivery_update', {
