@@ -27,4 +27,13 @@ router.get('/history/user', getPaymentHistory);
 // Validate payment method
 router.post('/validate-method', validatePaymentMethod);
 
+// Test endpoint to check if payment system is working
+router.get('/test', (req, res) => {
+    res.json({ 
+        message: 'Payment system is working',
+        user: req.user ? { id: req.user.id, role: req.user.role } : null,
+        timestamp: new Date().toISOString()
+    });
+});
+
 module.exports = router;

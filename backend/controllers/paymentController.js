@@ -105,8 +105,13 @@ const initiatePayment = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Payment initiation error:', error);
-        res.status(500).json({ message: 'Failed to initiate payment', error: error.message });
+        console.error('❌ Payment initiation error:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ 
+            message: 'Failed to initiate payment', 
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 
@@ -162,6 +167,9 @@ const processPayment = async (req, res) => {
             const deliveryToUpdate = await delivery.findById(payment.delivery._id);
             if (deliveryToUpdate && deliveryToUpdate.status === 'parcel_delivered') {
                 deliveryToUpdate.status = 'delivered';
+                if (!deliveryToUpdate.meta) {
+                    deliveryToUpdate.meta = {};
+                }
                 deliveryToUpdate.meta.deliveredAt = new Date();
                 await deliveryToUpdate.save();
 
@@ -238,8 +246,13 @@ const processPayment = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Payment processing error:', error);
-        res.status(500).json({ message: 'Failed to process payment', error: error.message });
+        console.error('❌ Payment processing error:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ 
+            message: 'Failed to process payment', 
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

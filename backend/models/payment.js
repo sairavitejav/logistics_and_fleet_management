@@ -4,7 +4,7 @@ const paymentSchema = new mongoose.Schema({
     // Reference to the delivery/ride
     delivery: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'delivery',
+        ref: 'Delivery',
         required: true
     },
     
