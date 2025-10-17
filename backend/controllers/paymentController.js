@@ -24,10 +24,19 @@ const initiatePayment = async (req, res) => {
         const { deliveryId } = req.body;
         const customerId = req.user.id;
 
+        console.log('🚀 Payment initiation request:', { deliveryId, customerId });
+
         // Get delivery details
         const deliveryDoc = await delivery.findById(deliveryId)
             .populate('customer', 'name email')
             .populate('driver', 'name email');
+
+        console.log('📦 Found delivery:', deliveryDoc ? { 
+            id: deliveryDoc._id, 
+            status: deliveryDoc.status, 
+            customer: deliveryDoc.customer?._id,
+            fare: deliveryDoc.fare 
+        } : 'null');
 
         if (!deliveryDoc) {
             return res.status(404).json({ message: 'Delivery not found' });
@@ -39,9 +48,11 @@ const initiatePayment = async (req, res) => {
         }
 
         // Check if delivery is ready for payment (parcel_delivered status)
+        console.log('🔍 Checking delivery status:', deliveryDoc.status);
         if (deliveryDoc.status !== 'parcel_delivered') {
+            console.log('❌ Payment not allowed for status:', deliveryDoc.status);
             return res.status(400).json({ 
-                message: 'Payment can only be made after parcel is delivered',
+                message: `Payment can only be made after parcel is delivered. Current status: ${deliveryDoc.status}`,
                 currentStatus: deliveryDoc.status 
             });
         }

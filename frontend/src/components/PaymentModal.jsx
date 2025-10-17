@@ -78,7 +78,9 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
     try {
       // First initiate payment
       if (!paymentData) {
-        const initResponse = await paymentAPI.initiate(deliveryData.id);
+        console.log('🚀 Initiating payment for delivery:', deliveryData._id);
+        console.log('📦 Delivery data:', deliveryData);
+        const initResponse = await paymentAPI.initiate(deliveryData._id);
         setPaymentData(initResponse);
       }
 
