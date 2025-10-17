@@ -90,8 +90,11 @@ const initiatePayment = async (req, res) => {
         };
 
         // Create payment record
+        console.log('💾 Creating payment with data:', paymentData);
         const payment = new Payment(paymentData);
+        console.log('💾 Payment object created, saving...');
         await payment.save();
+        console.log('✅ Payment saved successfully:', payment._id);
 
         // Return payment details for frontend
         res.status(201).json({

@@ -47,7 +47,7 @@ const paymentSchema = new mongoose.Schema({
         type: {
             type: String,
             enum: ['card', 'upi', 'wallet', 'netbanking'],
-            required: true
+            required: false // Made optional for initiation, will be set during processing
         },
         // For card payments
         cardDetails: {
@@ -123,6 +123,9 @@ const paymentSchema = new mongoose.Schema({
 paymentSchema.pre('save', function(next) {
     if (!this.transactionId) {
         this.transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    }
+    if (!this.receipt) {
+        this.receipt = {};
     }
     if (!this.receipt.receiptNumber) {
         this.receipt.receiptNumber = `RCP${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
