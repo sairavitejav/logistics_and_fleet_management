@@ -1,5 +1,5 @@
 const Payment = require('../models/payment');
-const delivery = require('../models/delivery');
+const Delivery = require('../models/delivery');
 const User = require('../models/user');
 const { sendPaymentReceiptEmail } = require('../services/emailService');
 
@@ -20,6 +20,10 @@ const simulatePaymentGateway = async (paymentData) => {
 
 // Initiate payment process
 const initiatePayment = async (req, res) => {
+    console.log('🔥 PAYMENT INITIATE FUNCTION CALLED');
+    console.log('🔥 Request body:', req.body);
+    console.log('🔥 User:', req.user);
+    
     try {
         const { deliveryId } = req.body;
         const customerId = req.user.id;
@@ -27,7 +31,9 @@ const initiatePayment = async (req, res) => {
         console.log('🚀 Payment initiation request:', { deliveryId, customerId });
 
         // Get delivery details
-        const deliveryDoc = await delivery.findById(deliveryId)
+        console.log('🔍 Looking for delivery with ID:', deliveryId);
+        console.log('🔍 Delivery model:', Delivery);
+        const deliveryDoc = await Delivery.findById(deliveryId)
             .populate('customer', 'name email')
             .populate('driver', 'name email');
 
@@ -116,11 +122,17 @@ const initiatePayment = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Payment initiation error:', error);
-        console.error('Error stack:', error.stack);
+        console.error('❌ Error name:', error.name);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error stack:', error.stack);
+        
+        // Send a more detailed error response
         res.status(500).json({ 
             message: 'Failed to initiate payment', 
             error: error.message,
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            errorName: error.name,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            timestamp: new Date().toISOString()
         });
     }
 };
@@ -174,7 +186,7 @@ const processPayment = async (req, res) => {
             await payment.save();
 
             // Update delivery status to delivered (payment completed)
-            const deliveryToUpdate = await delivery.findById(payment.delivery._id);
+            const deliveryToUpdate = await Delivery.findById(payment.delivery._id);
             if (deliveryToUpdate && deliveryToUpdate.status === 'parcel_delivered') {
                 deliveryToUpdate.status = 'delivered';
                 if (!deliveryToUpdate.meta) {
