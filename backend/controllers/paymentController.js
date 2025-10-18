@@ -116,6 +116,10 @@ const initiatePayment = async (req, res) => {
         const baseFare = 50; // Fixed base fare
         const distanceFare = deliveryDoc.fare - baseFare;
         
+        // Generate unique IDs
+        const transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        const receiptNumber = `RCP${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+        
         const paymentData = {
             delivery: deliveryId,
             customer: customerId,
@@ -125,7 +129,12 @@ const initiatePayment = async (req, res) => {
                 distanceFare,
                 totalAmount: deliveryDoc.fare
             },
-            status: 'pending'
+            status: 'pending',
+            transactionId: transactionId,
+            receipt: {
+                receiptNumber: receiptNumber,
+                emailSent: false
+            }
         };
 
         // Create payment record
