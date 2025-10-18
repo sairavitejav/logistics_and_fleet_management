@@ -3,7 +3,15 @@ const dotenv = require('dotenv').config();
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || process.env.CONNECTION_STRING, {
+    // Check for multiple possible environment variable names
+    const mongoUri = process.env.MONGODB_URI || process.env.CONNECTION_STRING || process.env.MONGO_URI;
+    
+    if (!mongoUri) {
+      throw new Error('No MongoDB connection string found. Please set MONGODB_URI, CONNECTION_STRING, or MONGO_URI environment variable.');
+    }
+    
+    console.log('🔗 Attempting to connect to MongoDB...');
+    const conn = await mongoose.connect(mongoUri, {
 
     });
     console.log(`MongoDB Connected: ${conn.connection.host} ${conn.connection.name}`);

@@ -77,11 +77,23 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
 
     try {
       // First initiate payment
-      if (!paymentData) {
+      let currentPaymentData = paymentData;
+      if (!currentPaymentData) {
         console.log('🚀 Initiating payment for delivery:', deliveryData._id);
         console.log('📦 Delivery data:', deliveryData);
         const initResponse = await paymentAPI.initiate(deliveryData._id);
+        
+        if (!initResponse || !initResponse.paymentId) {
+          throw new Error('Failed to initiate payment. Please try again.');
+        }
+        
+        currentPaymentData = initResponse;
         setPaymentData(initResponse);
+      }
+
+      // Validate payment data
+      if (!currentPaymentData || !currentPaymentData.paymentId) {
+        throw new Error('Invalid payment data. Please refresh and try again.');
       }
 
       // Prepare payment method data
@@ -108,7 +120,7 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
       setCurrentStep(3); // Processing
 
       // Process payment
-      const response = await paymentAPI.process(paymentData.paymentId, paymentMethod);
+      const response = await paymentAPI.process(currentPaymentData.paymentId, paymentMethod);
       
       if (response.success) {
         setCurrentStep(4); // Success

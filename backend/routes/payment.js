@@ -25,6 +25,8 @@ router.get('/debug', (req, res) => {
         environment: {
             SECRET_KEY: process.env.SECRET_KEY ? 'SET' : 'MISSING',
             MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'MISSING',
+            CONNECTION_STRING: process.env.CONNECTION_STRING ? 'SET' : 'MISSING',
+            MONGO_URI: process.env.MONGO_URI ? 'SET' : 'MISSING',
             NODE_ENV: process.env.NODE_ENV || 'undefined'
         },
         timestamp: new Date().toISOString()
