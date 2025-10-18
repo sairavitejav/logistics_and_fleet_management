@@ -1,5 +1,14 @@
 // 🔥 API utility for making HTTP requests
+// Force the backend URL to always be the Render deployment
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://logistics-and-fleet-management-backend.onrender.com/api';
+
+// Ensure we're always using the correct backend URL
+const BACKEND_URL = 'https://logistics-and-fleet-management-backend.onrender.com/api';
+const FINAL_API_URL = import.meta.env.VITE_API_BASE_URL || BACKEND_URL;
+
+// Log the API URL being used for debugging
+console.log('🔗 Environment API URL:', import.meta.env.VITE_API_BASE_URL);
+console.log('🔗 Final API URL configured:', FINAL_API_URL);
 
 // Get token from localStorage
 const getToken = () => localStorage.getItem('token');
@@ -12,7 +21,7 @@ const getHeaders = () => ({
 
 // Generic fetch wrapper
 const fetchAPI = async (endpoint, options = {}) => {
-  const url = `${API_URL}${endpoint}`;
+  const url = `${FINAL_API_URL}${endpoint}`;
   const config = {
     ...options,
     headers: {
