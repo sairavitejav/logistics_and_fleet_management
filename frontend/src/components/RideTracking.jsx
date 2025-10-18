@@ -7,6 +7,8 @@ import { getSocket } from '../utils/socket';
 import { useToast } from './Toast';
 import { MapSkeleton } from './LoadingSkeleton';
 import PaymentModal from './PaymentModal';
+import RoutingMachine from './RoutingMachine';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../styles/RideTracking.css';
 
@@ -366,14 +368,12 @@ const RideTracking = () => {
               </Marker>
             )}
 
-            {/* Route Line */}
-            {driverLocation && (
-              <Polyline
-                positions={[driverLocation, pickupCoords, dropCoords]}
-                color="var(--primary)"
-                weight={3}
-              />
-            )}
+            {/* Actual Road Route */}
+            <RoutingMachine 
+              start={pickupCoords} 
+              end={dropCoords} 
+              color="#007bff"
+            />
           </MapContainer>
         </div>
 

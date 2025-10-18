@@ -260,7 +260,11 @@ const acceptRide = async (req, res) => {
         await ride.save();
         
         // Update driver status
-        await User.findByIdAndUpdate(req.user.id, { driverStatus: 'on_ride' });
+        const updatedDriver = await User.findByIdAndUpdate(
+            req.user.id, 
+            { driverStatus: 'on_ride' },
+            { new: true }
+        );
         
         // Ensure vehicle has weightCapacity
         if (!vehicle.weightCapacity || vehicle.weightCapacity === 0) {
@@ -279,10 +283,20 @@ const acceptRide = async (req, res) => {
         
         await ride.populate('driver vehicle customer');
         
-        // Notify customer
+        // Notify customer and driver
         const io = req.app.get('io');
-        if (io && ride.customer) {
-            io.to(`customer: ${ride.customer._id.toString()}`).emit('ride_accepted', ride);
+        if (io) {
+            // Notify customer about ride acceptance
+            if (ride.customer) {
+                io.to(`customer: ${ride.customer._id.toString()}`).emit('ride_accepted', ride);
+            }
+            
+            // Notify driver about status change
+            io.to(`driver: ${req.user.id}`).emit('driver_status_updated', {
+                status: 'on_ride',
+                user: updatedDriver,
+                ride: ride
+            });
         }
         
         res.json(ride);
@@ -431,7 +445,11 @@ const completeRide = async (req, res) => {
         await ride.save();
         
         // Update driver status back to online
-        await User.findByIdAndUpdate(req.user.id, { driverStatus: 'online' });
+        const updatedDriver = await User.findByIdAndUpdate(
+            req.user.id, 
+            { driverStatus: 'online' },
+            { new: true }
+        );
         
         // Update vehicle status to available
         if (ride.vehicle) {
@@ -440,10 +458,18 @@ const completeRide = async (req, res) => {
         
         console.log(`✅ Ride ${id} completed by driver ${req.user.id}`);
         
-        // Emit socket event
+        // Emit socket events
         const io = req.app.get('io');
         if (io) {
+            // Notify customer about ride completion
             io.to(ride.customer.toString()).emit('rideCompleted', { ride });
+            
+            // Notify driver about status change back to online
+            io.to(`driver: ${req.user.id}`).emit('driver_status_updated', {
+                status: 'online',
+                user: updatedDriver,
+                ride: ride
+            });
         }
         
         res.json({ 

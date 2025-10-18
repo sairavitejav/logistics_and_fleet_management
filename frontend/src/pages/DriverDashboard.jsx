@@ -10,6 +10,7 @@ import RideMapView from '../components/RideMapView';
 import DriverFeedback from '../components/DriverFeedback';
 import { deliveryAPI } from '../utils/api';
 import { useToast } from '../components/Toast'; // ✨ Added Toast
+import { getSocket } from '../utils/socket'; // ✨ Added Socket
 import '../styles/Dashboard.css';
 
 const DriverDashboard = () => {
@@ -108,6 +109,31 @@ const DriverDashboard = () => {
       setTimeout(checkOngoingRides, 100);
     }
   }, [user]);
+
+  // Socket listener for driver status updates
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !user?.id) return;
+
+    console.log('🔌 Setting up driver status socket listeners');
+
+    // Listen for driver status updates
+    socket.on('driver_status_updated', (data) => {
+      console.log('📡 Driver status updated:', data);
+      if (data.status) {
+        setDriverStatus(data.status);
+        updateUser({ ...user, driverStatus: data.status });
+        showToast(`Status updated to ${data.status}`, 'success');
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      if (socket) {
+        socket.off('driver_status_updated');
+      }
+    };
+  }, [user, updateUser, showToast]);
 
   const handleLogout = () => {
     logout();
