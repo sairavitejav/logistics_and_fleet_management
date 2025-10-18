@@ -23,16 +23,49 @@ const initiatePayment = async (req, res) => {
     console.log('🔥 PAYMENT INITIATE FUNCTION CALLED');
     console.log('🔥 Request body:', req.body);
     console.log('🔥 User:', req.user);
+    console.log('🔥 Environment check:', {
+        SECRET_KEY: process.env.SECRET_KEY ? 'SET' : 'MISSING',
+        MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'MISSING',
+        NODE_ENV: process.env.NODE_ENV
+    });
     
     try {
         const { deliveryId } = req.body;
+        
+        // Check if user exists and has required properties
+        if (!req.user || !req.user.id) {
+            console.error('❌ User authentication failed - no user or user.id');
+            return res.status(401).json({ 
+                message: 'Authentication failed - user not found',
+                debug: { user: req.user ? 'exists' : 'null' }
+            });
+        }
+        
         const customerId = req.user.id;
 
         console.log('🚀 Payment initiation request:', { deliveryId, customerId });
 
         // Get delivery details
         console.log('🔍 Looking for delivery with ID:', deliveryId);
-        console.log('🔍 Delivery model:', Delivery);
+        console.log('🔍 Delivery model available:', !!Delivery);
+        
+        if (!deliveryId) {
+            console.error('❌ No deliveryId provided');
+            return res.status(400).json({ 
+                message: 'Delivery ID is required',
+                debug: { deliveryId }
+            });
+        }
+        
+        // Check if deliveryId is a valid ObjectId
+        if (!deliveryId.match(/^[0-9a-fA-F]{24}$/)) {
+            console.error('❌ Invalid deliveryId format:', deliveryId);
+            return res.status(400).json({ 
+                message: 'Invalid delivery ID format',
+                debug: { deliveryId }
+            });
+        }
+        
         const deliveryDoc = await Delivery.findById(deliveryId)
             .populate('customer', 'name email')
             .populate('driver', 'name email');
@@ -97,10 +130,30 @@ const initiatePayment = async (req, res) => {
 
         // Create payment record
         console.log('💾 Creating payment with data:', paymentData);
+        
+        // Check if Payment model is available
+        if (!Payment) {
+            console.error('❌ Payment model not available');
+            return res.status(500).json({ 
+                message: 'Payment model not available',
+                debug: { Payment: !!Payment }
+            });
+        }
+        
         const payment = new Payment(paymentData);
         console.log('💾 Payment object created, saving...');
-        await payment.save();
-        console.log('✅ Payment saved successfully:', payment._id);
+        
+        try {
+            await payment.save();
+            console.log('✅ Payment saved successfully:', payment._id);
+        } catch (saveError) {
+            console.error('❌ Payment save error:', saveError);
+            return res.status(500).json({ 
+                message: 'Failed to save payment to database',
+                error: saveError.message,
+                debug: { paymentData }
+            });
+        }
 
         // Return payment details for frontend
         res.status(201).json({
