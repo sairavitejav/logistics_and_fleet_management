@@ -38,36 +38,8 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
     }
   }, [isOpen]);
 
-  // Auto-fill dummy data when method is selected
-  const fillDummyData = (method) => {
-    switch (method) {
-      case 'card':
-        const randomCard = DUMMY_CARDS.visa[0];
-        setCardForm({
-          number: randomCard.number,
-          holderName: 'John Doe',
-          expiry: { month: '12', year: '2025' },
-          cvv: generateDummyCVV('visa')
-        });
-        break;
-      case 'upi':
-        setUpiForm({
-          upiId: 'user@okaxis',
-          provider: 'googlepay'
-        });
-        break;
-      case 'wallet':
-        setWalletForm({
-          provider: 'paytm',
-          walletId: 'user@paytm'
-        });
-        break;
-    }
-  };
-
   const handleMethodSelect = (method) => {
     setSelectedMethod(method);
-    fillDummyData(method);
     setCurrentStep(2);
   };
 
@@ -308,10 +280,9 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
                             ...cardForm,
                             number: e.target.value.replace(/\s/g, '')
                           })}
-                          placeholder="1234 5678 9012 3456"
+                          placeholder="Enter your 16-digit card number"
                           maxLength="19"
                         />
-                        <small>Use dummy test cards: 4111111111111111 (Visa)</small>
                       </div>
 
                       <div className="form-group">
@@ -323,7 +294,7 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
                             ...cardForm,
                             holderName: e.target.value
                           })}
-                          placeholder="John Doe"
+                          placeholder="Enter name as on card"
                         />
                       </div>
 
@@ -373,7 +344,7 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
                               ...cardForm,
                               cvv: e.target.value
                             })}
-                            placeholder="123"
+                            placeholder="3-4 digit security code"
                             maxLength="4"
                           />
                         </div>
@@ -393,7 +364,7 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
                             ...upiForm,
                             upiId: e.target.value
                           })}
-                          placeholder="yourname@okaxis"
+                          placeholder="Enter your UPI ID (e.g., yourname@paytm)"
                         />
                       </div>
 
@@ -452,7 +423,7 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
                             ...walletForm,
                             walletId: e.target.value
                           })}
-                          placeholder="your-wallet-id"
+                          placeholder="Enter your registered mobile number or email"
                         />
                       </div>
                     </div>
