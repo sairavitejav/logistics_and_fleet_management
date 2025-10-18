@@ -378,6 +378,7 @@ const RideTracking = () => {
         </div>
 
         <div className="ride-details">
+          {/* Ride Information Card */}
           <div className="detail-card">
             <h3>Ride Information</h3>
             <div className="detail-item">
@@ -399,7 +400,16 @@ const RideTracking = () => {
               </span>
             </div>
           </div>
+        </div>
+      </div>
 
+      {/* Bottom Cards Section - Driver and Payment Cards */}
+      <div className="bottom-cards-section">
+        <div className={`cards-container ${
+          activeRide.driver && (activeRide.status === 'parcel_delivered' || paymentRequired) 
+            ? 'has-both-cards' 
+            : ''
+        }`}>
           {activeRide.driver && (
             <div className="detail-card driver-card">
               <h3>Driver Details</h3>
