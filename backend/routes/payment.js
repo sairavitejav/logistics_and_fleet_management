@@ -3,9 +3,10 @@ const router = express.Router();
 const {
     initiatePayment,
     processPayment,
+    verifyPayment,
     getPaymentDetails,
     getPaymentHistory,
-    validatePaymentMethod
+    getRazorpayKey
 } = require('../controllers/paymentController');
 const { auth } = require('../middleware/auth');
 
@@ -52,20 +53,23 @@ router.post('/initiate', (req, res, next) => {
     next();
 }, auth, initiatePayment);
 
+// Get Razorpay key (public endpoint, no auth required)
+router.get('/razorpay-key', getRazorpayKey);
+
 // All other routes require authentication
 router.use(auth);
 
-// Process payment with selected method
+// Process payment with selected method (legacy endpoint)
 router.post('/:paymentId/process', processPayment);
+
+// Verify Razorpay payment
+router.post('/:paymentId/verify', verifyPayment);
 
 // Get payment details
 router.get('/:paymentId', getPaymentDetails);
 
 // Get payment history for user
 router.get('/history/user', getPaymentHistory);
-
-// Validate payment method
-router.post('/validate-method', validatePaymentMethod);
 
 // Test endpoint to check if payment system is working (requires auth)
 router.get('/test', (req, res) => {

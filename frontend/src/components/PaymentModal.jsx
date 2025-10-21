@@ -1,115 +1,113 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { paymentAPI, DUMMY_CARDS, UPI_PROVIDERS, WALLET_PROVIDERS, formatCardNumber, getCardType, validateExpiry, generateDummyCVV } from '../utils/paymentAPI';
+import { paymentAPI, openRazorpayCheckout, loadRazorpayScript } from '../utils/paymentAPI';
 import './PaymentModal.css';
 
 const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
-  const [currentStep, setCurrentStep] = useState(1); // 1: Method Selection, 2: Details, 3: Processing, 4: Success
-  const [selectedMethod, setSelectedMethod] = useState('');
+  const [currentStep, setCurrentStep] = useState(1); // 1: Initiating, 2: Processing, 3: Success
   const [paymentData, setPaymentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Form states
-  const [cardForm, setCardForm] = useState({
-    number: '',
-    holderName: '',
-    expiry: { month: '', year: '' },
-    cvv: ''
-  });
-  const [upiForm, setUpiForm] = useState({
-    upiId: '',
-    provider: ''
-  });
-  const [walletForm, setWalletForm] = useState({
-    provider: '',
-    walletId: ''
-  });
-
-  // Reset form when modal opens
+  // Initialize payment when modal opens
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(1);
-      setSelectedMethod('');
       setError('');
-      setCardForm({ number: '', holderName: '', expiry: { month: '', year: '' }, cvv: '' });
-      setUpiForm({ upiId: '', provider: '' });
-      setWalletForm({ provider: '', walletId: '' });
+      setPaymentData(null);
+      initiatePaymentProcess();
     }
   }, [isOpen]);
 
-  const handleMethodSelect = (method) => {
-    setSelectedMethod(method);
-    setCurrentStep(2);
-  };
-
-  const handlePaymentSubmit = async () => {
+  const initiatePaymentProcess = async () => {
     setLoading(true);
     setError('');
 
     try {
-      // First initiate payment
-      let currentPaymentData = paymentData;
-      if (!currentPaymentData) {
-        console.log('🚀 Initiating payment for delivery:', deliveryData._id);
-        console.log('📦 Delivery data:', deliveryData);
-        const initResponse = await paymentAPI.initiate(deliveryData._id);
-        
-        if (!initResponse || !initResponse.paymentId) {
-          throw new Error('Failed to initiate payment. Please try again.');
-        }
-        
-        currentPaymentData = initResponse;
-        setPaymentData(initResponse);
-      }
-
-      // Validate payment data
-      if (!currentPaymentData || !currentPaymentData.paymentId) {
-        throw new Error('Invalid payment data. Please refresh and try again.');
-      }
-
-      // Prepare payment method data
-      let paymentMethod = { type: selectedMethod };
-
-      switch (selectedMethod) {
-        case 'card':
-          paymentMethod.cardNumber = cardForm.number;
-          paymentMethod.cardHolderName = cardForm.holderName;
-          paymentMethod.expiryMonth = cardForm.expiry.month;
-          paymentMethod.expiryYear = cardForm.expiry.year;
-          paymentMethod.cvv = cardForm.cvv;
-          break;
-        case 'upi':
-          paymentMethod.upiId = upiForm.upiId;
-          paymentMethod.provider = upiForm.provider;
-          break;
-        case 'wallet':
-          paymentMethod.walletProvider = walletForm.provider;
-          paymentMethod.walletId = walletForm.walletId;
-          break;
-      }
-
-      setCurrentStep(3); // Processing
-
-      // Process payment
-      const response = await paymentAPI.process(currentPaymentData.paymentId, paymentMethod);
+      console.log('🚀 Initiating payment for delivery:', deliveryData._id);
       
-      if (response.success) {
-        setCurrentStep(4); // Success
-        setTimeout(() => {
-          onPaymentSuccess(response.payment);
-          onClose();
-        }, 3000);
-      } else {
-        throw new Error(response.message || 'Payment failed');
+      // Ensure Razorpay script is loaded
+      await loadRazorpayScript();
+      
+      // Initiate payment on backend
+      const initResponse = await paymentAPI.initiate(deliveryData._id);
+      
+      if (!initResponse || !initResponse.paymentId) {
+        throw new Error('Failed to initiate payment. Please try again.');
       }
+
+      console.log('✅ Payment initiated:', initResponse);
+      setPaymentData(initResponse);
+
+      // Open Razorpay checkout
+      const options = {
+        key: initResponse.razorpayKeyId,
+        amount: initResponse.amount.totalAmount * 100, // Convert to paise
+        currency: 'INR',
+        name: 'Logistics & Fleet Management',
+        description: `Payment for ${initResponse.delivery.vehicleType} delivery`,
+        order_id: initResponse.razorpayOrderId,
+        prefill: {
+          name: initResponse.customer.name,
+          email: initResponse.customer.email,
+          contact: '' // Add contact if available
+        },
+        notes: {
+          deliveryId: initResponse.delivery.id,
+          pickupLocation: initResponse.delivery.pickupLocation,
+          dropoffLocation: initResponse.delivery.dropoffLocation
+        },
+        theme: {
+          color: '#3399cc'
+        }
+      };
+
+      setCurrentStep(2); // Processing
+      setLoading(false);
+
+      openRazorpayCheckout(
+        options,
+        (razorpayResponse) => handlePaymentSuccess(razorpayResponse, initResponse.paymentId),
+        (error) => handlePaymentFailure(error)
+      );
 
     } catch (err) {
-      setError(err.message || 'Payment failed. Please try again.');
-      setCurrentStep(2); // Go back to details
-    } finally {
+      console.error('❌ Payment initiation error:', err);
+      setError(err.message || 'Failed to initiate payment. Please try again.');
       setLoading(false);
     }
+  };
+
+  const handlePaymentSuccess = async (razorpayResponse, paymentId) => {
+    try {
+      console.log('🔐 Verifying payment...');
+      setCurrentStep(2); // Processing
+
+      // Verify payment on backend
+      const verifyResponse = await paymentAPI.verify(paymentId, razorpayResponse);
+
+      if (verifyResponse.success) {
+        console.log('✅ Payment verified successfully');
+        setCurrentStep(3); // Success
+        
+        setTimeout(() => {
+          onPaymentSuccess(verifyResponse.payment);
+          onClose();
+        }, 2000);
+      } else {
+        throw new Error(verifyResponse.message || 'Payment verification failed');
+      }
+    } catch (err) {
+      console.error('❌ Payment verification error:', err);
+      setError(err.message || 'Payment verification failed');
+      setCurrentStep(1);
+    }
+  };
+
+  const handlePaymentFailure = (error) => {
+    console.error('❌ Payment failed:', error);
+    setError(error.message || 'Payment failed. Please try again.');
+    setCurrentStep(1);
   };
 
   const modalVariants = {
@@ -154,316 +152,57 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
             <div className="progress-bar">
               <div 
                 className="progress-fill" 
-                style={{ width: `${(currentStep / 4) * 100}%` }}
+                style={{ width: `${(currentStep / 3) * 100}%` }}
               />
             </div>
             <div className="progress-steps">
-              <span className={currentStep >= 1 ? 'active' : ''}>Method</span>
-              <span className={currentStep >= 2 ? 'active' : ''}>Details</span>
-              <span className={currentStep >= 3 ? 'active' : ''}>Processing</span>
-              <span className={currentStep >= 4 ? 'active' : ''}>Complete</span>
+              <span className={currentStep >= 1 ? 'active' : ''}>Initiating</span>
+              <span className={currentStep >= 2 ? 'active' : ''}>Processing</span>
+              <span className={currentStep >= 3 ? 'active' : ''}>Complete</span>
             </div>
           </div>
 
           {/* Content */}
           <div className="payment-content">
             <AnimatePresence mode="wait">
-              {/* Step 1: Method Selection */}
+              {/* Step 1: Initiating */}
               {currentStep === 1 && (
                 <motion.div
-                  key="method-selection"
+                  key="initiating"
                   variants={stepVariants}
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="payment-step"
+                  className="payment-step processing-step"
                 >
-                  <h3>Choose Payment Method</h3>
-                  
-                  {/* Amount Display */}
-                  <div className="amount-display">
-                    <span>Amount to Pay</span>
-                    <strong>₹{deliveryData?.fare || 0}</strong>
-                  </div>
-
-                  <div className="payment-methods">
-                    <motion.div 
-                      className="payment-method-card"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleMethodSelect('card')}
+                  <div className="processing-animation">
+                    <motion.div
+                      className="spinner"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     >
-                      <div className="method-icon">💳</div>
-                      <div className="method-info">
-                        <h4>Credit/Debit Card</h4>
-                        <p>Visa, Mastercard, Amex</p>
-                      </div>
+                      💳
                     </motion.div>
+                    <h3>Initiating Payment...</h3>
+                    <p>Please wait while we prepare your payment</p>
+                    
+                    {/* Amount Display */}
+                    <div className="amount-display" style={{ marginTop: '20px' }}>
+                      <span>Amount to Pay</span>
+                      <strong>₹{deliveryData?.fare || 0}</strong>
+                    </div>
 
-                    <motion.div 
-                      className="payment-method-card"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleMethodSelect('upi')}
-                    >
-                      <div className="method-icon">📱</div>
-                      <div className="method-info">
-                        <h4>UPI</h4>
-                        <p>Google Pay, PhonePe, Paytm</p>
+                    {error && (
+                      <div className="error-message" style={{ marginTop: '20px' }}>
+                        {error}
                       </div>
-                    </motion.div>
-
-                    <motion.div 
-                      className="payment-method-card"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleMethodSelect('wallet')}
-                    >
-                      <div className="method-icon">💰</div>
-                      <div className="method-info">
-                        <h4>Digital Wallet</h4>
-                        <p>Paytm, PhonePe, Amazon Pay</p>
-                      </div>
-                    </motion.div>
-
-                    <motion.div 
-                      className="payment-method-card"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleMethodSelect('netbanking')}
-                    >
-                      <div className="method-icon">🏦</div>
-                      <div className="method-info">
-                        <h4>Net Banking</h4>
-                        <p>All major banks</p>
-                      </div>
-                    </motion.div>
+                    )}
                   </div>
                 </motion.div>
               )}
 
-              {/* Step 2: Payment Details */}
+              {/* Step 2: Processing */}
               {currentStep === 2 && (
-                <motion.div
-                  key="payment-details"
-                  variants={stepVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  className="payment-step"
-                >
-                  <div className="step-header">
-                    <button 
-                      className="back-btn"
-                      onClick={() => setCurrentStep(1)}
-                    >
-                      ← Back
-                    </button>
-                    <h3>Enter {selectedMethod.toUpperCase()} Details</h3>
-                  </div>
-
-                  {error && (
-                    <div className="error-message">
-                      {error}
-                    </div>
-                  )}
-
-                  {/* Card Form */}
-                  {selectedMethod === 'card' && (
-                    <div className="card-form">
-                      <div className="form-group">
-                        <label>Card Number</label>
-                        <input
-                          type="text"
-                          value={formatCardNumber(cardForm.number)}
-                          onChange={(e) => setCardForm({
-                            ...cardForm,
-                            number: e.target.value.replace(/\s/g, '')
-                          })}
-                          placeholder="Enter your 16-digit card number"
-                          maxLength="19"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Cardholder Name</label>
-                        <input
-                          type="text"
-                          value={cardForm.holderName}
-                          onChange={(e) => setCardForm({
-                            ...cardForm,
-                            holderName: e.target.value
-                          })}
-                          placeholder="Enter name as on card"
-                        />
-                      </div>
-
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label>Expiry Month</label>
-                          <select
-                            value={cardForm.expiry.month}
-                            onChange={(e) => setCardForm({
-                              ...cardForm,
-                              expiry: { ...cardForm.expiry, month: e.target.value }
-                            })}
-                          >
-                            <option value="">MM</option>
-                            {Array.from({ length: 12 }, (_, i) => (
-                              <option key={i + 1} value={String(i + 1).padStart(2, '0')}>
-                                {String(i + 1).padStart(2, '0')}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="form-group">
-                          <label>Expiry Year</label>
-                          <select
-                            value={cardForm.expiry.year}
-                            onChange={(e) => setCardForm({
-                              ...cardForm,
-                              expiry: { ...cardForm.expiry, year: e.target.value }
-                            })}
-                          >
-                            <option value="">YYYY</option>
-                            {Array.from({ length: 10 }, (_, i) => (
-                              <option key={i} value={2024 + i}>
-                                {2024 + i}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="form-group">
-                          <label>CVV</label>
-                          <input
-                            type="text"
-                            value={cardForm.cvv}
-                            onChange={(e) => setCardForm({
-                              ...cardForm,
-                              cvv: e.target.value
-                            })}
-                            placeholder="3-4 digit security code"
-                            maxLength="4"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* UPI Form */}
-                  {selectedMethod === 'upi' && (
-                    <div className="upi-form">
-                      <div className="form-group">
-                        <label>UPI ID</label>
-                        <input
-                          type="text"
-                          value={upiForm.upiId}
-                          onChange={(e) => setUpiForm({
-                            ...upiForm,
-                            upiId: e.target.value
-                          })}
-                          placeholder="Enter your UPI ID (e.g., yourname@paytm)"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>UPI Provider</label>
-                        <div className="upi-providers">
-                          {UPI_PROVIDERS.map(provider => (
-                            <motion.div
-                              key={provider.id}
-                              className={`provider-option ${upiForm.provider === provider.id ? 'selected' : ''}`}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setUpiForm({
-                                ...upiForm,
-                                provider: provider.id
-                              })}
-                            >
-                              {provider.name}
-                            </motion.div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Wallet Form */}
-                  {selectedMethod === 'wallet' && (
-                    <div className="wallet-form">
-                      <div className="form-group">
-                        <label>Select Wallet</label>
-                        <div className="wallet-providers">
-                          {WALLET_PROVIDERS.map(wallet => (
-                            <motion.div
-                              key={wallet.id}
-                              className={`provider-option ${walletForm.provider === wallet.id ? 'selected' : ''}`}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setWalletForm({
-                                ...walletForm,
-                                provider: wallet.id
-                              })}
-                            >
-                              <span className="wallet-icon">{wallet.icon}</span>
-                              {wallet.name}
-                            </motion.div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label>Wallet ID</label>
-                        <input
-                          type="text"
-                          value={walletForm.walletId}
-                          onChange={(e) => setWalletForm({
-                            ...walletForm,
-                            walletId: e.target.value
-                          })}
-                          placeholder="Enter your registered mobile number or email"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Net Banking */}
-                  {selectedMethod === 'netbanking' && (
-                    <div className="netbanking-form">
-                      <div className="bank-selection">
-                        <h4>Select Your Bank</h4>
-                        <div className="bank-grid">
-                          {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'PNB'].map(bank => (
-                            <motion.div
-                              key={bank}
-                              className="bank-option"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              {bank}
-                            </motion.div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <motion.button
-                    className="pay-now-btn"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handlePaymentSubmit}
-                    disabled={loading}
-                  >
-                    {loading ? 'Processing...' : `Pay ₹${deliveryData?.fare || 0}`}
-                  </motion.button>
-                </motion.div>
-              )}
-
-              {/* Step 3: Processing */}
-              {currentStep === 3 && (
                 <motion.div
                   key="processing"
                   variants={stepVariants}
@@ -480,14 +219,14 @@ const PaymentModal = ({ isOpen, onClose, deliveryData, onPaymentSuccess }) => {
                     >
                       💳
                     </motion.div>
-                    <h3>Processing Payment...</h3>
-                    <p>Please wait while we process your payment securely</p>
+                    <h3>Verifying Payment...</h3>
+                    <p>Please wait while we verify your payment with Razorpay</p>
                   </div>
                 </motion.div>
               )}
 
-              {/* Step 4: Success */}
-              {currentStep === 4 && (
+              {/* Step 3: Success */}
+              {currentStep === 3 && (
                 <motion.div
                   key="success"
                   variants={stepVariants}

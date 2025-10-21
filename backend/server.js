@@ -104,6 +104,7 @@ app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/payments', require('./routes/payment'));
+app.use('/api/webhooks', require('./routes/webhook'));
 // app.use('/api/tracking', require('./routes/tracking'));
 
 // 🔥 NEW: Socket.IO connection handling

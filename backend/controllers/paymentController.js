@@ -2,21 +2,7 @@ const Payment = require('../models/payment');
 const Delivery = require('../models/delivery');
 const User = require('../models/user');
 const { sendPaymentReceiptEmail } = require('../services/emailService');
-
-// Dummy payment gateway simulation
-const simulatePaymentGateway = async (paymentData) => {
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Always return success as per requirements
-    return {
-        success: true,
-        responseCode: '00',
-        responseMessage: 'Transaction Successful',
-        gatewayTransactionId: `GW${Date.now()}${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
-        processedAt: new Date()
-    };
-};
+const { createOrder, verifyPaymentSignature, fetchPaymentDetails } = require('../services/razorpayService');
 
 // Initiate payment process
 const initiatePayment = async (req, res) => {
@@ -164,11 +150,43 @@ const initiatePayment = async (req, res) => {
             });
         }
 
+        // Create Razorpay order
+        const razorpayOrder = await createOrder({
+            amount: payment.amount.totalAmount,
+            currency: 'INR',
+            receipt: payment.receipt.receiptNumber,
+            notes: {
+                deliveryId: deliveryDoc._id.toString(),
+                customerId: customerId,
+                customerName: deliveryDoc.customer.name,
+                vehicleType: deliveryDoc.vehicleType
+            }
+        });
+
+        if (!razorpayOrder.success) {
+            // Delete the payment record if Razorpay order creation fails
+            await Payment.findByIdAndDelete(payment._id);
+            return res.status(500).json({ 
+                message: 'Failed to create Razorpay order',
+                error: razorpayOrder.error
+            });
+        }
+
+        // Update payment with Razorpay order ID
+        payment.razorpay = {
+            orderId: razorpayOrder.order.id
+        };
+        await payment.save();
+
+        console.log('✅ Razorpay order created:', razorpayOrder.order.id);
+
         // Return payment details for frontend
         res.status(201).json({
             paymentId: payment._id,
             transactionId: payment.transactionId,
             amount: payment.amount,
+            razorpayOrderId: razorpayOrder.order.id,
+            razorpayKeyId: process.env.RAZORPAY_KEY_ID,
             delivery: {
                 id: deliveryDoc._id,
                 pickupLocation: deliveryDoc.pickupLocation,
@@ -199,12 +217,14 @@ const initiatePayment = async (req, res) => {
     }
 };
 
-// Process payment with selected method
-const processPayment = async (req, res) => {
+// Verify and complete payment
+const verifyPayment = async (req, res) => {
     try {
         const { paymentId } = req.params;
-        const { paymentMethod } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         const customerId = req.user.id;
+
+        console.log('🔐 Verifying payment:', { paymentId, razorpay_order_id, razorpay_payment_id });
 
         // Get payment record
         const payment = await Payment.findById(paymentId)
@@ -229,22 +249,76 @@ const processPayment = async (req, res) => {
             });
         }
 
-        // Update payment status to processing
-        payment.status = 'processing';
-        payment.paymentMethod = paymentMethod;
-        await payment.save();
+        // Verify Razorpay order ID matches
+        if (payment.razorpay.orderId !== razorpay_order_id) {
+            return res.status(400).json({ 
+                message: 'Order ID mismatch',
+                expected: payment.razorpay.orderId,
+                received: razorpay_order_id
+            });
+        }
 
-        // Simulate payment gateway processing
-        const gatewayResponse = await simulatePaymentGateway({
-            amount: payment.amount.totalAmount,
-            paymentMethod
+        // Verify payment signature
+        const isValidSignature = verifyPaymentSignature({
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature
         });
 
-        if (gatewayResponse.success) {
+        if (!isValidSignature) {
+            payment.status = 'failed';
+            payment.gatewayResponse = {
+                responseCode: 'SIGNATURE_VERIFICATION_FAILED',
+                responseMessage: 'Payment signature verification failed',
+                processedAt: new Date()
+            };
+            await payment.save();
+
+            return res.status(400).json({
+                success: false,
+                message: 'Payment verification failed'
+            });
+        }
+
+        // Fetch payment details from Razorpay
+        const paymentDetailsResponse = await fetchPaymentDetails(razorpay_payment_id);
+        
+        if (!paymentDetailsResponse.success) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to fetch payment details from Razorpay'
+            });
+        }
+
+        const razorpayPayment = paymentDetailsResponse.payment;
+
+        // Update payment status to processing
+        payment.status = 'processing';
+        payment.razorpay.paymentId = razorpay_payment_id;
+        payment.razorpay.signature = razorpay_signature;
+        await payment.save();
+
+        // Check if payment was captured successfully
+        if (razorpayPayment.status === 'captured' || razorpayPayment.status === 'authorized') {
             // Update payment as completed
             payment.status = 'completed';
             payment.completedAt = new Date();
-            payment.gatewayResponse = gatewayResponse;
+            payment.paymentMethod = {
+                type: razorpayPayment.method
+            };
+            payment.gatewayResponse = {
+                responseCode: razorpayPayment.status,
+                responseMessage: 'Payment successful',
+                gatewayTransactionId: razorpay_payment_id,
+                processedAt: new Date(razorpayPayment.created_at * 1000),
+                method: razorpayPayment.method,
+                bank: razorpayPayment.bank,
+                wallet: razorpayPayment.wallet,
+                vpa: razorpayPayment.vpa,
+                cardId: razorpayPayment.card_id,
+                email: razorpayPayment.email,
+                contact: razorpayPayment.contact
+            };
             await payment.save();
 
             // Update delivery status to delivered (payment completed)
@@ -319,28 +393,36 @@ const processPayment = async (req, res) => {
             });
 
         } else {
-            // Payment failed (though this won't happen in dummy mode)
+            // Payment failed or not captured
             payment.status = 'failed';
-            payment.gatewayResponse = gatewayResponse;
+            payment.gatewayResponse = {
+                responseCode: razorpayPayment.status,
+                responseMessage: `Payment ${razorpayPayment.status}`,
+                gatewayTransactionId: razorpay_payment_id,
+                processedAt: new Date()
+            };
             await payment.save();
 
             res.status(400).json({
                 success: false,
-                message: 'Payment failed',
-                error: gatewayResponse.responseMessage
+                message: 'Payment not successful',
+                status: razorpayPayment.status
             });
         }
 
     } catch (error) {
-        console.error('❌ Payment processing error:', error);
+        console.error('❌ Payment verification error:', error);
         console.error('Error stack:', error.stack);
         res.status(500).json({ 
-            message: 'Failed to process payment', 
+            message: 'Failed to verify payment', 
             error: error.message,
             details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 };
+
+// Legacy process payment endpoint (kept for backward compatibility)
+const processPayment = verifyPayment;
 
 // Get payment details
 const getPaymentDetails = async (req, res) => {
@@ -407,72 +489,23 @@ const getPaymentHistory = async (req, res) => {
     }
 };
 
-// Dummy card validation (for realistic dummy numbers)
-const validateDummyCard = (cardNumber) => {
-    const dummyCards = {
-        // Visa
-        '4111111111111111': { type: 'visa', valid: true },
-        '4012888888881881': { type: 'visa', valid: true },
-        // Mastercard
-        '5555555555554444': { type: 'mastercard', valid: true },
-        '5105105105105100': { type: 'mastercard', valid: true },
-        // American Express
-        '378282246310005': { type: 'amex', valid: true },
-        '371449635398431': { type: 'amex', valid: true },
-        // Discover
-        '6011111111111117': { type: 'discover', valid: true },
-        '6011000990139424': { type: 'discover', valid: true }
-    };
-
-    return dummyCards[cardNumber] || { type: 'unknown', valid: false };
-};
-
-// Validate payment method
-const validatePaymentMethod = async (req, res) => {
+// Get Razorpay key for frontend
+const getRazorpayKey = async (req, res) => {
     try {
-        const { paymentMethod } = req.body;
-
-        let validation = { valid: true, message: 'Valid payment method' };
-
-        switch (paymentMethod.type) {
-            case 'card':
-                const cardValidation = validateDummyCard(paymentMethod.cardNumber);
-                if (!cardValidation.valid) {
-                    validation = { valid: false, message: 'Invalid card number. Use dummy test cards.' };
-                } else {
-                    validation.cardType = cardValidation.type;
-                    validation.last4Digits = paymentMethod.cardNumber.slice(-4);
-                }
-                break;
-
-            case 'upi':
-                // Simple UPI ID validation
-                if (!paymentMethod.upiId || !paymentMethod.upiId.includes('@')) {
-                    validation = { valid: false, message: 'Invalid UPI ID format' };
-                }
-                break;
-
-            case 'wallet':
-                // Validate wallet provider
-                const validWallets = ['paytm', 'phonepe', 'googlepay', 'amazonpay'];
-                if (!validWallets.includes(paymentMethod.walletProvider?.toLowerCase())) {
-                    validation = { valid: false, message: 'Unsupported wallet provider' };
-                }
-                break;
-        }
-
-        res.json(validation);
-
+        res.json({
+            key: process.env.RAZORPAY_KEY_ID
+        });
     } catch (error) {
-        console.error('Payment method validation error:', error);
-        res.status(500).json({ message: 'Failed to validate payment method', error: error.message });
+        console.error('Get Razorpay key error:', error);
+        res.status(500).json({ message: 'Failed to get Razorpay key', error: error.message });
     }
 };
 
 module.exports = {
     initiatePayment,
     processPayment,
+    verifyPayment,
     getPaymentDetails,
     getPaymentHistory,
-    validatePaymentMethod
+    getRazorpayKey
 };

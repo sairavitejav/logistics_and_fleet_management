@@ -81,12 +81,27 @@ const paymentSchema = new mongoose.Schema({
         unique: true
     },
     
-    // Gateway response (dummy data)
+    // Razorpay specific fields
+    razorpay: {
+        orderId: String,
+        paymentId: String,
+        signature: String
+    },
+    
+    // Gateway response
     gatewayResponse: {
         responseCode: String,
         responseMessage: String,
         gatewayTransactionId: String,
-        processedAt: Date
+        processedAt: Date,
+        // Additional Razorpay response data
+        method: String, // card, upi, wallet, netbanking
+        bank: String,
+        wallet: String,
+        vpa: String, // UPI ID
+        cardId: String,
+        email: String,
+        contact: String
     },
     
     // Receipt details
