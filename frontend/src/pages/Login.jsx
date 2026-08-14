@@ -165,7 +165,7 @@ const Login = () => {
           >
             {loading ? (
               <>
-                <FaSpinner className="spin" /> Signing In...
+                <FaSpinner className="spin" /> Signing you In...
               </>
             ) : (
               <>
